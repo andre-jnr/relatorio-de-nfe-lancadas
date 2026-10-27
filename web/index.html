@@ -135,7 +135,27 @@ tr:last-child td{border-bottom:0}
 .r{text-align:right}
 tfoot td{font-weight:700;border-top:1px solid var(--line);border-bottom:0}
 tbody tr:hover{background:var(--surface-2)}
-#t-lojas td:first-child,#b-lancadas td:nth-child(2){white-space:nowrap}
+#t-lojas td:first-child,#b-lancadas tr.nota td:nth-child(3){white-space:nowrap}
+
+/* notas lançadas: expandir contas a pagar */
+.exp-cel{width:52px;padding-right:0}
+.exp{border:0;background:transparent;color:var(--ink-3);cursor:pointer;padding:4px 6px;border-radius:7px;display:inline-flex;align-items:center;gap:2px;font:inherit;font-size:11.5px;font-weight:600}
+.exp:hover{color:var(--accent);background:var(--accent-soft)}
+.exp svg{transition:transform .15s}
+tr.aberta .exp svg,.exp.on svg{transform:rotate(90deg)}
+tr.aberta .exp{color:var(--accent)}
+tr.nota{cursor:pointer}
+tr.aberta td{border-bottom-color:transparent}
+tr.det:hover{background:none}
+tr.det td{padding:0 10px 14px}
+.tit-box{display:inline-block;max-width:100%;overflow-x:auto;background:var(--surface-2);border-radius:10px;padding:2px 4px}
+.tit-box table{width:auto;min-width:min(520px,100%)}
+.tit-box th,.tit-box td{padding:6px 12px;font-size:12.5px}
+.tit-box tbody tr:hover{background:none}
+.tit-box tbody tr:last-child td{border-bottom:0}
+.tit-box tfoot td{font-weight:600;border-top:1px solid var(--line);border-bottom:0}
+.tit-dif{color:var(--warn);font-weight:500;font-size:11.5px;margin-left:8px}
+.tit-vazio{color:var(--ink-3);font-size:12.5px;padding:8px 12px}
 tr.grp td{background:var(--surface-2);font-size:12px;font-weight:600;color:var(--ink-2);padding:7px 10px;letter-spacing:.02em}
 tr.grp:hover td{background:var(--surface-2)}
 tr.grp .gv{float:right;font-weight:500;color:var(--ink-3)}
@@ -310,7 +330,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       <div class="view on" id="v-lancadas">
         <h3 class="print-only">Notas lançadas</h3>
         <div class="tablebox"><table>
-          <thead><tr><th>Hora</th><th>Loja</th><th>NF</th><th>Fornecedor</th><th>Emissão</th><th>Usuário</th><th class="r">Valor</th></tr></thead>
+          <thead><tr><th class="exp-cel"><button class="exp no-print" id="exp-todas" title="Expandir / recolher as contas a pagar de todas as notas"></button></th><th>Hora</th><th>Loja</th><th>NF</th><th>Fornecedor</th><th>Emissão</th><th>Usuário</th><th class="r">Valor</th></tr></thead>
           <tbody id="b-lancadas"></tbody>
         </table></div>
       </div>
@@ -394,6 +414,7 @@ const ICON = {
   undo: '<svg class="i" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>',
   move: '<svg class="i" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
   del: '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  seta: '<svg class="i" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>',
 };
 
 let LOJAS = [], lancadas = [], manuais = [], D = hojeISO();
@@ -571,13 +592,53 @@ function renderLojas(g) {
 
 const filtroBusca = txt => { const q = $('#busca').value.trim().toLowerCase(); return !q || txt.toLowerCase().includes(q); };
 
+// ---- contas a pagar de cada nota lançada (expandir) ----
+const abertas = new Set();   // notas expandidas: "loja|chave da entrada"
+const chaveNota = n => n.loja + '|' + n.chave;
+const lancadasVisiveis = () => lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' ')));
+
+function detalheTitulos(n) {
+  if (!n.titulos.length) return '<div class="tit-box"><div class="tit-vazio">Nenhuma conta a pagar vinculada a esta nota.</div></div>';
+  const total = soma(n.titulos), dif = n.valor - total;
+  return `<div class="tit-box"><table>
+    <thead><tr><th>Código</th><th>Parcela</th><th>Vencimento</th><th class="r">Prazo</th><th class="r">Valor</th></tr></thead>
+    <tbody>${n.titulos.map(t => `<tr>
+      <td class="num">${t.codigo}</td><td class="num">${t.parcela}/${n.titulos.length}</td>
+      <td class="num">${t.vencimento}${t.pago ? ' <span class="pill ok">pago</span>' : ''}</td>
+      <td class="r num" title="Dias da emissão (${n.emissao}) até o vencimento">${t.prazo == null ? '—' : t.prazo + (Math.abs(t.prazo) === 1 ? ' dia' : ' dias')}</td>
+      <td class="r num">${BRL.format(t.valor)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="4">Total${Math.abs(dif) >= 0.01 ? `<span class="tit-dif">${BRL.format(dif)} de diferença para o valor da nota</span>` : ''}</td>
+      <td class="r num">${BRL.format(total)}</td></tr></tfoot>
+  </table></div>`;
+}
+
+$('#b-lancadas').addEventListener('click', e => {
+  const tr = e.target.closest('tr.nota');
+  if (!tr) return;
+  abertas.has(tr.dataset.k) ? abertas.delete(tr.dataset.k) : abertas.add(tr.dataset.k);
+  renderLancadas();
+});
+$('#exp-todas').innerHTML = ICON.seta;
+$('#exp-todas').onclick = () => {
+  const vis = lancadasVisiveis().map(chaveNota);
+  const todasAbertas = vis.length && vis.every(k => abertas.has(k));
+  vis.forEach(k => todasAbertas ? abertas.delete(k) : abertas.add(k));
+  renderLancadas();
+};
+
 function renderLancadas() {
-  const rows = lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' ')));
-  $('#b-lancadas').innerHTML = rows.length ? rows.map(n => `<tr>
+  const rows = lancadasVisiveis();
+  $('#exp-todas').classList.toggle('on', rows.length > 0 && rows.every(n => abertas.has(chaveNota(n))));
+  $('#b-lancadas').innerHTML = rows.length ? rows.map(n => {
+    const k = chaveNota(n), aberta = abertas.has(k), qt = n.titulos.length;
+    return `<tr class="nota${aberta ? ' aberta' : ''}" data-k="${esc(k)}">
+    <td class="exp-cel"><button class="exp" title="${qt ? qt + (qt > 1 ? ' contas a pagar' : ' conta a pagar') : 'Sem contas a pagar'}">${ICON.seta}${qt || ''}</button></td>
     <td class="num">${n.hora}</td><td>${esc(n.loja)}</td><td class="num">${esc(n.nf)}${n.serie ? `<span style="color:var(--ink-3)">/${esc(n.serie)}</span>` : ''}</td>
     <td>${esc(n.fornecedor)}${n.chegada < D ? ` <span class="pill old" title="Estava no a lançar/pendentes desde ${dmy(n.chegada)}">chegou ${dm(n.chegada)}</span>` : ''}</td><td class="num">${n.emissao}</td>
-    <td><span class="pill">${esc(n.usuario)}</span></td><td class="r num">${BRL.format(n.valor)}</td></tr>`).join('')
-    : `<tr><td colspan="7" class="empty">${lancadas.length ? 'Nada encontrado na busca.' : 'Nenhuma nota lançada nesta data.'}</td></tr>`;
+    <td><span class="pill">${esc(n.usuario)}</span></td><td class="r num">${BRL.format(n.valor)}</td></tr>`
+      + (aberta ? `<tr class="det"><td></td><td colspan="7">${detalheTitulos(n)}</td></tr>` : '');
+  }).join('')
+    : `<tr><td colspan="8" class="empty">${lancadas.length ? 'Nada encontrado na busca.' : 'Nenhuma nota lançada nesta data.'}</td></tr>`;
 }
 
 function situacao(m) {

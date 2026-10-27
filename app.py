@@ -85,6 +85,15 @@ WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ?
 ORDER BY e.Data_Cadastro
 """
 
+# Contas a pagar geradas pelas notas lançadas no período (títulos excluídos ficam de fora).
+SQL_TITULOS = """
+SELECT cp.Codigo_Entrada, cp.Codigo, cp.Parcela, cp.Data_Vencimento, cp.Valor, cp.Pago
+FROM Contas_Pagar cp
+JOIN Entrada_Produto e ON e.Chave = cp.Codigo_Entrada
+WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ? AND cp.Data_Exclusao IS NULL
+ORDER BY cp.Codigo_Entrada, cp.Data_Vencimento, cp.Parcela
+"""
+
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
@@ -117,17 +126,25 @@ def local():
 
 # ---------- SISMOURA (somente leitura) ----------
 
-def consultar(loja, sql, *params):
+def consultar_varias(loja, *consultas):
+    """Roda várias consultas (sql, params) na mesma conexão. Devolve uma lista de linhas por consulta."""
     conn = conectar(cfg, loja, 60 if loja == "moradadosol" else 30)
     try:
         cur = conn.cursor()
         cur.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
-        cur.execute(sql, *params)
-        cols = [c[0] for c in cur.description]
-        return [dict(zip(cols, r)) for r in cur.fetchall()]
+        resultados = []
+        for sql, params in consultas:
+            cur.execute(sql, *params)
+            cols = [c[0] for c in cur.description]
+            resultados.append([dict(zip(cols, r)) for r in cur.fetchall()])
+        return resultados
     finally:
         conn.rollback()
         conn.close()
+
+
+def consultar(loja, sql, *params):
+    return consultar_varias(loja, (sql, params))[0]
 
 
 def em_paralelo(func, lojas):
@@ -145,9 +162,23 @@ def em_paralelo(func, lojas):
 
 def buscar_lancadas(loja, dia):
     ini = datetime.combine(dia, datetime.min.time())
+    periodo = (ini, ini + timedelta(days=1))
+    notas, titulos = consultar_varias(loja, (SQL_LANCADAS, periodo), (SQL_TITULOS, periodo))
+    por_entrada = {}
+    for t in titulos:
+        por_entrada.setdefault(t["Codigo_Entrada"], []).append(t)
     out = []
-    for d in consultar(loja, SQL_LANCADAS, ini, ini + timedelta(days=1)):
+    for d in notas:
+        emissao = d["Data_Emissao"].date() if d["Data_Emissao"] else None
         out.append({
+            "titulos": [{
+                "codigo": t["Codigo"],
+                "parcela": t["Parcela"],
+                "vencimento": t["Data_Vencimento"].strftime("%d/%m/%Y"),
+                "prazo": (t["Data_Vencimento"].date() - emissao).days if emissao else None,
+                "valor": float(t["Valor"] or 0),
+                "pago": t["Pago"] == "S",
+            } for t in por_entrada.get(d["Chave"], [])],
             "loja": LOJAS[loja],
             "chave": d["Chave"],
             "chave_nfe": (d["Chave_NFE"] or "").strip(),
