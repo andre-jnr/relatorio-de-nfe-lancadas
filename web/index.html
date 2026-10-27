@@ -116,6 +116,16 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .mes .trk{height:6px;border-radius:4px;background:var(--bar-track);overflow:hidden}
 .mes .trk span{display:block;height:100%;background:var(--old);border-radius:4px}
 .mes b{font-weight:600;color:var(--ink)}
+.kpi.filtro{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.kpi.filtro:hover{border-color:var(--ink-3)}
+.kpi.filtro:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpi.filtro.ativo{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.kpi.filtro.ativo::after{content:"Filtrando";position:absolute;top:14px;right:16px;font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:20px}
+.filtro-ativo{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:var(--ink-2)}
+.filtro-ativo[hidden]{display:none}
+.filtro-ativo .pill{background:var(--accent-soft);color:var(--accent)}
+.filtro-ativo button{border:0;background:none;color:var(--ink-3);cursor:pointer;font:inherit;font-size:12.5px;text-decoration:underline}
+.tit-box tr.fora td{opacity:.4}
 
 /* grid */
 .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:18px}
@@ -314,13 +324,13 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 
     <!-- contas a pagar geradas pelas notas lançadas no dia, pelo mês de vencimento -->
     <section class="kpis cp">
-      <div class="card kpi" title="Títulos das notas lançadas neste dia com vencimento até o fim do mês">
+      <div class="card kpi filtro" data-faixa="mes" role="button" tabindex="0" title="Títulos das notas lançadas neste dia com vencimento até o fim do mês. Clique para filtrar as notas.">
         <div class="lbl"><span class="dot" style="background:var(--accent)"></span><span id="k-cpm-l">Contas a pagar deste mês</span></div>
         <div class="val num" id="k-cpm">—</div>
         <div class="money num" id="k-cpm-q">—</div>
         <div class="foot" id="k-cpm-f"></div>
       </div>
-      <div class="card kpi" title="Títulos das notas lançadas neste dia com vencimento nos meses seguintes">
+      <div class="card kpi filtro" data-faixa="prox" role="button" tabindex="0" title="Títulos das notas lançadas neste dia com vencimento nos meses seguintes. Clique para filtrar as notas.">
         <div class="lbl"><span class="dot" style="background:var(--old)"></span>Contas a pagar dos próximos meses</div>
         <div class="val num" id="k-cpp">—</div>
         <div class="money num" id="k-cpp-q">—</div>
@@ -356,6 +366,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 
       <div class="view on" id="v-lancadas">
         <h3 class="print-only">Notas lançadas</h3>
+        <div class="filtro-ativo" id="filtro-cp" hidden>Mostrando só as notas com <span class="pill" id="filtro-cp-txt"></span><button class="no-print" id="filtro-cp-limpar">limpar filtro</button></div>
         <div class="tablebox"><table>
           <thead><tr><th class="exp-cel"><button class="exp no-print" id="exp-todas" title="Expandir / recolher as contas a pagar de todas as notas"></button></th><th>Hora</th><th>Loja</th><th>NF</th><th>Fornecedor</th><th>Emissão</th><th>Usuário</th><th class="r">Valor</th></tr></thead>
           <tbody id="b-lancadas"></tbody>
@@ -624,10 +635,11 @@ const filtroBusca = txt => { const q = $('#busca').value.trim().toLowerCase(); r
 // "Deste mês" = vence até o fim do mês da data do relatório (inclui as já vencidas); o resto é "próximos meses".
 const NOME_MES = new Intl.DateTimeFormat('pt-BR', {month:'long', year:'numeric', timeZone:'UTC'});
 const nomeMes = ym => NOME_MES.format(new Date(ym + '-15T12:00Z'));
+const anoMes = t => t.vencimento.slice(6, 10) + '-' + t.vencimento.slice(3, 5);   // "dd/mm/aaaa" → "aaaa-mm"
+const faixaTitulo = t => anoMes(t) <= D.slice(0, 7) ? 'mes' : 'prox';
 function contasAPagar() {
-  const mesD = D.slice(0, 7);
-  const tit = lancadas.flatMap(n => n.titulos.map(t => ({...t, nota: chaveNota(n), ym: t.vencimento.slice(6, 10) + '-' + t.vencimento.slice(3, 5)})));
-  const mes = tit.filter(t => t.ym <= mesD), prox = tit.filter(t => t.ym > mesD);
+  const tit = lancadas.flatMap(n => n.titulos.map(t => ({...t, nota: chaveNota(n), ym: anoMes(t)})));
+  const mes = tit.filter(t => faixaTitulo(t) === 'mes'), prox = tit.filter(t => faixaTitulo(t) === 'prox');
   const porMes = {};
   prox.forEach(t => porMes[t.ym] = (porMes[t.ym] || 0) + t.valor);
   return {mes, prox, porMes: Object.entries(porMes).sort(([a], [b]) => a.localeCompare(b))};
@@ -637,8 +649,28 @@ const resumoTitulos = arr => {
   return `${INT.format(arr.length)} título${arr.length === 1 ? '' : 's'} de ${INT.format(notas)} nota${notas === 1 ? '' : 's'}`;
 };
 
+// Filtro pelos cards: só as notas que têm ao menos um título na faixa ('mes' ou 'prox'); null = sem filtro
+let filtroCP = null;
+function filtrarPorCP(faixa) {
+  filtroCP = filtroCP === faixa ? null : faixa;   // clicar no card ativo desliga o filtro
+  if (filtroCP) {
+    $('.tab[data-t="lancadas"]').click();
+    $('#v-lancadas').scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+  renderContasAPagar(); renderLancadas();
+}
+$$('.kpi.filtro').forEach(card => {
+  card.onclick = () => filtrarPorCP(card.dataset.faixa);
+  card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); filtrarPorCP(card.dataset.faixa); } };
+});
+$('#filtro-cp-limpar').onclick = () => filtrarPorCP(filtroCP);
+
 function renderContasAPagar() {
   const c = contasAPagar(), mesD = D.slice(0, 7);
+  $$('.kpi.filtro').forEach(card => card.classList.toggle('ativo', card.dataset.faixa === filtroCP));
+  $('#filtro-cp').hidden = !filtroCP;
+  if (filtroCP) $('#filtro-cp-txt').textContent = filtroCP === 'mes'
+    ? `contas a pagar de ${nomeMes(mesD).split(' de ')[0]}` : 'contas a pagar dos próximos meses';
   $('#k-cpm-l').textContent = 'Contas a pagar de ' + NOME_MES.format(new Date(D + 'T12:00Z')).split(' de ')[0];
   $('#k-cpm').textContent = BRL.format(soma(c.mes));
   $('#k-cpm-q').textContent = resumoTitulos(c.mes);
@@ -661,14 +693,15 @@ function renderContasAPagar() {
 // ---- contas a pagar de cada nota lançada (expandir) ----
 const abertas = new Set();   // notas expandidas: "loja|chave da entrada"
 const chaveNota = n => n.loja + '|' + n.chave;
-const lancadasVisiveis = () => lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' ')));
+const lancadasVisiveis = () => lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' '))
+  && (!filtroCP || n.titulos.some(t => faixaTitulo(t) === filtroCP)));
 
 function detalheTitulos(n) {
   if (!n.titulos.length) return '<div class="tit-box"><div class="tit-vazio">Nenhuma conta a pagar vinculada a esta nota.</div></div>';
   const total = soma(n.titulos), dif = n.valor - total;
   return `<div class="tit-box"><table>
     <thead><tr><th>Código</th><th>Parcela</th><th>Vencimento</th><th class="r">Prazo</th><th class="r">Valor</th></tr></thead>
-    <tbody>${n.titulos.map(t => `<tr>
+    <tbody>${n.titulos.map(t => `<tr${filtroCP && faixaTitulo(t) !== filtroCP ? ' class="fora"' : ''}>
       <td class="num">${t.codigo}</td><td class="num">${t.parcela}/${n.titulos.length}</td>
       <td class="num">${t.vencimento}${t.pago ? ' <span class="pill ok">pago</span>' : ''}</td>
       <td class="r num" title="Dias da emissão (${n.emissao}) até o vencimento">${t.prazo == null ? '—' : t.prazo + (Math.abs(t.prazo) === 1 ? ' dia' : ' dias')}</td>
