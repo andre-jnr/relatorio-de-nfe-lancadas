@@ -524,6 +524,9 @@ def gerar_excel(p):
          f"{k['anteriores']['mes_anterior']} do mês anterior"],
         ["Pendentes", k["pendentes"]["qt"], k["pendentes"]["valor"],
          f"{k['pendentes']['novas']} nova(s) hoje · {k['pendentes']['qt'] - k['pendentes']['novas']} anteriores"],
+        ["Contas a pagar deste mês", k["cp_mes"]["qt"], k["cp_mes"]["valor"],
+         f"Títulos das lançadas com vencimento até o fim de {k['cp_mes']['mes']}"],
+        ["Contas a pagar dos próximos meses", k["cp_prox"]["qt"], k["cp_prox"]["valor"], k["cp_prox"]["meses"]],
     ], {3: MOEDA})
     ws.cell(5 + 1, 1).font = Font(bold=True)
     for r in (8, 9):  # detalhamento das lançadas

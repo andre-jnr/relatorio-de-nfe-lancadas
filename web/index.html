@@ -108,6 +108,15 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .orow b{font-weight:700;color:var(--ink)}
 .orow small{grid-column:2 / -1;color:var(--ink-3);font-size:11.5px}
 
+/* cards de contas a pagar (este mês / próximos meses) */
+.kpis.cp{grid-template-columns:1fr 1fr}
+.kpis.cp .val{font-size:30px}
+.meses{margin-top:12px;display:grid;gap:6px}
+.mes{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;font-size:12.5px;color:var(--ink-2)}
+.mes .trk{height:6px;border-radius:4px;background:var(--bar-track);overflow:hidden}
+.mes .trk span{display:block;height:100%;background:var(--old);border-radius:4px}
+.mes b{font-weight:600;color:var(--ink)}
+
 /* grid */
 .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:18px}
 .panel{padding:20px}
@@ -230,6 +239,8 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 }
 @media (max-width:520px){
   .wrap{padding:20px 16px 48px}
+  .kpis.cp{grid-template-columns:1fr}
+  .kpis.cp .val{font-size:24px}
   .kpi .val{font-size:28px}
   .kpi.main .val{font-size:36px}
   .urow{grid-template-columns:1fr auto}
@@ -299,6 +310,22 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       <div class="card kpi"><div class="lbl"><span class="dot" style="background:var(--warn)"></span>A lançar</div><div class="val num" id="k-alan">—</div><div class="money num" id="k-alan-v">—</div><div class="foot">Chegaram hoje e ficaram para depois</div></div>
       <div class="card kpi"><div class="lbl"><span class="dot" style="background:var(--old)"></span>De dias anteriores</div><div class="val num" id="k-ant">—</div><div class="money num" id="k-ant-v">—</div><div class="foot" id="k-ant-f"></div></div>
       <div class="card kpi"><div class="lbl"><span class="dot" style="background:var(--bad)"></span>Pendentes</div><div class="val num" id="k-pend">—</div><div class="money num" id="k-pend-v">—</div><div class="foot" id="k-pend-f"></div></div>
+    </section>
+
+    <!-- contas a pagar geradas pelas notas lançadas no dia, pelo mês de vencimento -->
+    <section class="kpis cp">
+      <div class="card kpi" title="Títulos das notas lançadas neste dia com vencimento até o fim do mês">
+        <div class="lbl"><span class="dot" style="background:var(--accent)"></span><span id="k-cpm-l">Contas a pagar deste mês</span></div>
+        <div class="val num" id="k-cpm">—</div>
+        <div class="money num" id="k-cpm-q">—</div>
+        <div class="foot" id="k-cpm-f"></div>
+      </div>
+      <div class="card kpi" title="Títulos das notas lançadas neste dia com vencimento nos meses seguintes">
+        <div class="lbl"><span class="dot" style="background:var(--old)"></span>Contas a pagar dos próximos meses</div>
+        <div class="val num" id="k-cpp">—</div>
+        <div class="money num" id="k-cpp-q">—</div>
+        <div class="meses" id="k-cpp-meses"></div>
+      </div>
     </section>
 
     <section class="grid2">
@@ -541,6 +568,7 @@ function render() {
   $('#c-lanc').textContent = lancadas.length;
   $('#c-alan').textContent = g.alHoje.length + g.alAnt.length;
   $('#c-pend').textContent = g.pend.length;
+  renderContasAPagar();
   renderUsuarios(); renderLojas(g); renderLancadas(); renderManuais('alancar'); renderManuais('pendente');
 }
 
@@ -591,6 +619,44 @@ function renderLojas(g) {
 }
 
 const filtroBusca = txt => { const q = $('#busca').value.trim().toLowerCase(); return !q || txt.toLowerCase().includes(q); };
+
+// ---- contas a pagar das notas lançadas no dia, pelo mês de vencimento ----
+// "Deste mês" = vence até o fim do mês da data do relatório (inclui as já vencidas); o resto é "próximos meses".
+const NOME_MES = new Intl.DateTimeFormat('pt-BR', {month:'long', year:'numeric', timeZone:'UTC'});
+const nomeMes = ym => NOME_MES.format(new Date(ym + '-15T12:00Z'));
+function contasAPagar() {
+  const mesD = D.slice(0, 7);
+  const tit = lancadas.flatMap(n => n.titulos.map(t => ({...t, nota: chaveNota(n), ym: t.vencimento.slice(6, 10) + '-' + t.vencimento.slice(3, 5)})));
+  const mes = tit.filter(t => t.ym <= mesD), prox = tit.filter(t => t.ym > mesD);
+  const porMes = {};
+  prox.forEach(t => porMes[t.ym] = (porMes[t.ym] || 0) + t.valor);
+  return {mes, prox, porMes: Object.entries(porMes).sort(([a], [b]) => a.localeCompare(b))};
+}
+const resumoTitulos = arr => {
+  const notas = new Set(arr.map(t => t.nota)).size;
+  return `${INT.format(arr.length)} título${arr.length === 1 ? '' : 's'} de ${INT.format(notas)} nota${notas === 1 ? '' : 's'}`;
+};
+
+function renderContasAPagar() {
+  const c = contasAPagar(), mesD = D.slice(0, 7);
+  $('#k-cpm-l').textContent = 'Contas a pagar de ' + NOME_MES.format(new Date(D + 'T12:00Z')).split(' de ')[0];
+  $('#k-cpm').textContent = BRL.format(soma(c.mes));
+  $('#k-cpm-q').textContent = resumoTitulos(c.mes);
+  const pagos = c.mes.filter(t => t.pago).length, vencidos = c.mes.filter(t => !t.pago && t.ym < mesD).length;
+  $('#k-cpm-f').innerHTML = c.mes.length
+    ? `Vencem até o fim de ${nomeMes(mesD).split(' de ')[0]}` + (pagos ? ` · <b>${pagos}</b> já pago${pagos > 1 ? 's' : ''}` : '')
+      + (vencidos ? ` · <b>${vencidos}</b> de meses anteriores` : '')
+    : 'Nenhum título vence neste mês';
+
+  $('#k-cpp').textContent = BRL.format(soma(c.prox));
+  $('#k-cpp-q').textContent = resumoTitulos(c.prox);
+  const maior = Math.max(1, ...c.porMes.map(([, v]) => v));
+  const meses = c.porMes.slice(0, 4), resto = c.porMes.slice(4);
+  $('#k-cpp-meses').innerHTML = c.porMes.length
+    ? meses.map(([ym, v]) => `<div class="mes"><span>${nomeMes(ym)}</span><span class="trk"><span style="width:${v / maior * 100}%"></span></span><b class="num">${BRL.format(v)}</b></div>`).join('')
+      + (resto.length ? `<div class="mes"><span>+${resto.length} ${resto.length > 1 ? 'meses' : 'mês'}</span><span></span><b class="num">${BRL.format(resto.reduce((s, [, v]) => s + v, 0))}</b></div>` : '')
+    : '<div class="foot" style="padding:0">Nenhum título para os próximos meses</div>';
+}
 
 // ---- contas a pagar de cada nota lançada (expandir) ----
 const abertas = new Set();   // notas expandidas: "loja|chave da entrada"
@@ -849,7 +915,7 @@ function linhasManuais(tipo) {
 }
 
 $('#excel').onclick = async () => {
-  const b = $('#excel'), g = grupos(), o = origemLancadas();
+  const b = $('#excel'), g = grupos(), o = origemLancadas(), cp = contasAPagar();
   b.disabled = true;
   try {
     const payload = {
@@ -862,6 +928,9 @@ $('#excel').onclick = async () => {
         alancar: {qt: g.alHoje.length, valor: soma(g.alHoje)},
         anteriores: {qt: g.alAnt.length, valor: soma(g.alAnt), mes_anterior: g.alAnt.filter(m => m.data.slice(0,7) < D.slice(0,7)).length},
         pendentes: {qt: g.pend.length, valor: soma(g.pend), novas: g.pend.filter(m => m.data === D).length},
+        cp_mes: {qt: cp.mes.length, valor: soma(cp.mes), mes: nomeMes(D.slice(0, 7))},
+        cp_prox: {qt: cp.prox.length, valor: soma(cp.prox),
+                  meses: cp.porMes.map(([ym, v]) => `${nomeMes(ym)}: ${BRL.format(v)}`).join(' · ')},
       },
       usuarios: porUsuario().map(u => ({nome: u.nome, lojas: [...u.lojas].join(', '), qt: u.qt, valor: u.valor})),
       lojas: porLoja(g),
