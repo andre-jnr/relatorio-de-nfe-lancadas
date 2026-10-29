@@ -109,8 +109,10 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .orow small{grid-column:2 / -1;color:var(--ink-3);font-size:11.5px}
 
 /* cards de contas a pagar (este mês / próximos meses) */
-.kpis.cp{grid-template-columns:1fr 1fr}
+.kpis.cp{grid-template-columns:1fr 1fr .8fr}
 .kpis.cp .val{font-size:30px}
+.tit-box tr.bon td{color:var(--ok)}
+.tit-box tr.bon td:first-child{font-weight:600}
 .meses{margin-top:12px;display:grid;gap:6px}
 .mes{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;font-size:12.5px;color:var(--ink-2)}
 .mes .trk{height:6px;border-radius:4px;background:var(--bar-track);overflow:hidden}
@@ -242,6 +244,8 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   .toolbar{grid-template-columns:1fr}
 }
 @media (max-width:900px){
+  .kpis.cp{grid-template-columns:1fr 1fr}
+  .kpis.cp .bonif{grid-column:1 / -1}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .grid2{grid-template-columns:1fr}
   .addrow,.addrow.semmotivo{grid-template-columns:1fr 1fr}
@@ -335,6 +339,12 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
         <div class="val num" id="k-cpp">—</div>
         <div class="money num" id="k-cpp-q">—</div>
         <div class="meses" id="k-cpp-meses"></div>
+      </div>
+      <div class="card kpi filtro bonif" data-faixa="bonif" role="button" tabindex="0" title="Itens com CFOP 1.910/2.910 (bonificação) nas notas lançadas neste dia. Clique para filtrar as notas.">
+        <div class="lbl"><span class="dot" style="background:var(--ok)"></span>Bonificado do dia</div>
+        <div class="val num" id="k-bon">—</div>
+        <div class="money num" id="k-bon-q">—</div>
+        <div class="foot" id="k-bon-f"></div>
       </div>
     </section>
 
@@ -649,8 +659,10 @@ const resumoTitulos = arr => {
   return `${INT.format(arr.length)} título${arr.length === 1 ? '' : 's'} de ${INT.format(notas)} nota${notas === 1 ? '' : 's'}`;
 };
 
-// Filtro pelos cards: só as notas que têm ao menos um título na faixa ('mes' ou 'prox'); null = sem filtro
+// Filtro pelos cards: 'mes'/'prox' = notas com ao menos um título na faixa; 'bonif' = notas com bonificação;
+// null = sem filtro
 let filtroCP = null;
+const TEXTO_FILTRO = {prox: 'contas a pagar dos próximos meses', bonif: 'bonificação (CFOP 1.910/2.910)'};
 function filtrarPorCP(faixa) {
   filtroCP = filtroCP === faixa ? null : faixa;   // clicar no card ativo desliga o filtro
   if (filtroCP) {
@@ -670,7 +682,14 @@ function renderContasAPagar() {
   $$('.kpi.filtro').forEach(card => card.classList.toggle('ativo', card.dataset.faixa === filtroCP));
   $('#filtro-cp').hidden = !filtroCP;
   if (filtroCP) $('#filtro-cp-txt').textContent = filtroCP === 'mes'
-    ? `contas a pagar de ${nomeMes(mesD).split(' de ')[0]}` : 'contas a pagar dos próximos meses';
+    ? `contas a pagar de ${nomeMes(mesD).split(' de ')[0]}` : TEXTO_FILTRO[filtroCP];
+
+  const bon = lancadas.filter(n => n.bonificado > 0), soBonif = bon.filter(n => !n.titulos.length).length;
+  $('#k-bon').textContent = BRL.format(bon.reduce((s, n) => s + n.bonificado, 0));
+  $('#k-bon-q').textContent = `${INT.format(bon.length)} nota${bon.length === 1 ? '' : 's'}`;
+  $('#k-bon-f').innerHTML = bon.length
+    ? `<b>${soBonif}</b> só de bonificação · <b>${bon.length - soBonif}</b> com itens a pagar`
+    : 'Nenhuma bonificação lançada';
   $('#k-cpm-l').textContent = 'Contas a pagar de ' + NOME_MES.format(new Date(D + 'T12:00Z')).split(' de ')[0];
   $('#k-cpm').textContent = BRL.format(soma(c.mes));
   $('#k-cpm-q').textContent = resumoTitulos(c.mes);
@@ -694,18 +713,23 @@ function renderContasAPagar() {
 const abertas = new Set();   // notas expandidas: "loja|chave da entrada"
 const chaveNota = n => n.loja + '|' + n.chave;
 const lancadasVisiveis = () => lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' '))
-  && (!filtroCP || n.titulos.some(t => faixaTitulo(t) === filtroCP)));
+  && (!filtroCP || (filtroCP === 'bonif' ? n.bonificado > 0 : n.titulos.some(t => faixaTitulo(t) === filtroCP))));
 
 function detalheTitulos(n) {
-  if (!n.titulos.length) return '<div class="tit-box"><div class="tit-vazio">Nenhuma conta a pagar vinculada a esta nota.</div></div>';
-  const total = soma(n.titulos), dif = n.valor - total;
+  if (!n.titulos.length && !n.bonificado) return '<div class="tit-box"><div class="tit-vazio">Nenhuma conta a pagar vinculada a esta nota.</div></div>';
+  // Total = títulos a pagar + itens bonificados (que não geram conta a pagar); deve bater com o valor da nota
+  const total = soma(n.titulos) + n.bonificado, dif = n.valor - total;
+  const esmaece = t => (filtroCP === 'mes' || filtroCP === 'prox') && faixaTitulo(t) !== filtroCP;
+  const linhaBonif = n.bonificado ? `<tr class="bon${filtroCP === 'mes' || filtroCP === 'prox' ? ' fora' : ''}">
+      <td colspan="4">Bonificação <span style="color:var(--ink-3);font-weight:400">· itens com CFOP 1.910/2.910, sem conta a pagar</span></td>
+      <td class="r num">${BRL.format(n.bonificado)}</td></tr>` : '';
   return `<div class="tit-box"><table>
     <thead><tr><th>Código</th><th>Parcela</th><th>Vencimento</th><th class="r">Prazo</th><th class="r">Valor</th></tr></thead>
-    <tbody>${n.titulos.map(t => `<tr${filtroCP && faixaTitulo(t) !== filtroCP ? ' class="fora"' : ''}>
+    <tbody>${n.titulos.map(t => `<tr${esmaece(t) ? ' class="fora"' : ''}>
       <td class="num">${t.codigo}</td><td class="num">${t.parcela}/${n.titulos.length}</td>
       <td class="num">${t.vencimento}${t.pago ? ' <span class="pill ok">pago</span>' : ''}</td>
       <td class="r num" title="Dias da emissão (${n.emissao}) até o vencimento">${t.prazo == null ? '—' : t.prazo + (Math.abs(t.prazo) === 1 ? ' dia' : ' dias')}</td>
-      <td class="r num">${BRL.format(t.valor)}</td></tr>`).join('')}</tbody>
+      <td class="r num">${BRL.format(t.valor)}</td></tr>`).join('')}${linhaBonif}</tbody>
     <tfoot><tr><td colspan="4">Total${Math.abs(dif) >= 0.01 ? `<span class="tit-dif">${BRL.format(dif)} de diferença para o valor da nota</span>` : ''}</td>
       <td class="r num">${BRL.format(total)}</td></tr></tfoot>
   </table></div>`;
@@ -733,7 +757,10 @@ function renderLancadas() {
     return `<tr class="nota${aberta ? ' aberta' : ''}" data-k="${esc(k)}">
     <td class="exp-cel"><button class="exp" title="${qt ? qt + (qt > 1 ? ' contas a pagar' : ' conta a pagar') : 'Sem contas a pagar'}">${ICON.seta}${qt || ''}</button></td>
     <td class="num">${n.hora}</td><td>${esc(n.loja)}</td><td class="num">${esc(n.nf)}${n.serie ? `<span style="color:var(--ink-3)">/${esc(n.serie)}</span>` : ''}</td>
-    <td>${esc(n.fornecedor)}${n.chegada < D ? ` <span class="pill old" title="Estava no a lançar/pendentes desde ${dmy(n.chegada)}">chegou ${dm(n.chegada)}</span>` : ''}</td><td class="num">${n.emissao}</td>
+    <td>${esc(n.fornecedor)}${n.chegada < D ? ` <span class="pill old" title="Estava no a lançar/pendentes desde ${dmy(n.chegada)}">chegou ${dm(n.chegada)}</span>` : ''}${
+      !n.bonificado ? '' : n.bonificado >= n.valor - 0.01
+        ? ' <span class="pill ok" title="Todos os itens com CFOP de bonificação">bonificação</span>'
+        : ` <span class="pill ok" title="Parte dos itens é bonificação (CFOP 1.910/2.910)">bonif. ${BRL.format(n.bonificado)}</span>`}</td><td class="num">${n.emissao}</td>
     <td><span class="pill">${esc(n.usuario)}</span></td><td class="r num">${BRL.format(n.valor)}</td></tr>`
       + (aberta ? `<tr class="det"><td></td><td colspan="7">${detalheTitulos(n)}</td></tr>` : '');
   }).join('')
@@ -961,6 +988,8 @@ $('#excel').onclick = async () => {
         alancar: {qt: g.alHoje.length, valor: soma(g.alHoje)},
         anteriores: {qt: g.alAnt.length, valor: soma(g.alAnt), mes_anterior: g.alAnt.filter(m => m.data.slice(0,7) < D.slice(0,7)).length},
         pendentes: {qt: g.pend.length, valor: soma(g.pend), novas: g.pend.filter(m => m.data === D).length},
+        bonif: {qt: lancadas.filter(n => n.bonificado > 0).length, valor: lancadas.reduce((s, n) => s + n.bonificado, 0),
+                so_bonif: lancadas.filter(n => n.bonificado > 0 && !n.titulos.length).length},
         cp_mes: {qt: cp.mes.length, valor: soma(cp.mes), mes: nomeMes(D.slice(0, 7))},
         cp_prox: {qt: cp.prox.length, valor: soma(cp.prox),
                   meses: cp.porMes.map(([ym, v]) => `${nomeMes(ym)}: ${BRL.format(v)}`).join(' · ')},
@@ -968,7 +997,8 @@ $('#excel').onclick = async () => {
       usuarios: porUsuario().map(u => ({nome: u.nome, lojas: [...u.lojas].join(', '), qt: u.qt, valor: u.valor})),
       lojas: porLoja(g),
       lancadas: lancadas.map(n => ({hora: n.hora, loja: n.loja, nf: n.nf, serie: n.serie, fornecedor: n.fornecedor,
-                                    emissao: n.emissao, chegada: n.chegada, usuario: n.usuario, valor: n.valor})),
+                                    emissao: n.emissao, chegada: n.chegada, usuario: n.usuario, valor: n.valor,
+                                    bonificado: n.bonificado})),
       alancar: linhasManuais('alancar'),
       pendentes: linhasManuais('pendente'),
     };

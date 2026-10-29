@@ -75,8 +75,11 @@ CNPJ_LOJA = {
 # Usuário que lançou: Operador da entrada → usuário que abriu → operador do título gerado no Contas a Pagar.
 SQL_LANCADAS = """
 SELECT e.Chave, e.Chave_NFE, e.Data_Cadastro, e.Nota_Fiscal, e.Serie, e.Nome_Fornecedor,
-       e.Valor_Nota, e.Data_Emissao, u.Nome AS Usuario
+       e.Valor_Nota, e.Data_Emissao, u.Nome AS Usuario, b.Bonificado
 FROM Entrada_Produto e
+OUTER APPLY (SELECT SUM(i.Valor_Total) AS Bonificado
+             FROM Entrada_Produto_Itens i
+             WHERE i.Chave = e.Chave AND REPLACE(i.CFOP, '.', '') IN ('1910', '2910')) b
 OUTER APPLY (SELECT TOP 1 NULLIF(cp.Operador, 0) AS Op
              FROM Contas_Pagar cp
              WHERE cp.Codigo_Entrada = e.Chave AND NULLIF(cp.Operador, 0) IS NOT NULL) cp
@@ -187,6 +190,7 @@ def buscar_lancadas(loja, dia):
             "serie": (d["Serie"] or "").strip(),
             "fornecedor": (d["Nome_Fornecedor"] or "").strip(),
             "valor": float(d["Valor_Nota"] or Decimal(0)),
+            "bonificado": float(d["Bonificado"] or Decimal(0)),  # itens com CFOP 1.910/2.910 (bonificação)
             "emissao": d["Data_Emissao"].strftime("%d/%m/%Y") if d["Data_Emissao"] else "",
             "usuario": " ".join((d["Usuario"] or "Não identificado").split()).title(),
         })
@@ -527,6 +531,8 @@ def gerar_excel(p):
         ["Contas a pagar deste mês", k["cp_mes"]["qt"], k["cp_mes"]["valor"],
          f"Títulos das lançadas com vencimento até o fim de {k['cp_mes']['mes']}"],
         ["Contas a pagar dos próximos meses", k["cp_prox"]["qt"], k["cp_prox"]["valor"], k["cp_prox"]["meses"]],
+        ["Bonificado (CFOP 1.910/2.910)", k["bonif"]["qt"], k["bonif"]["valor"],
+         f"{k['bonif']['so_bonif']} só de bonificação · {k['bonif']['qt'] - k['bonif']['so_bonif']} mista(s)"],
     ], {3: MOEDA})
     ws.cell(5 + 1, 1).font = Font(bold=True)
     for r in (8, 9):  # detalhamento das lançadas
@@ -550,11 +556,12 @@ def gerar_excel(p):
     ws = wb.create_sheet("Lançadas")
     cabecalho(ws, "Notas lançadas no SISMOURA")
     la = p["lancadas"]
-    tabela(ws, 4, ["Hora", "Loja", "NF", "Série", "Fornecedor", "Emissão", "Chegada", "Usuário", "Valor"],
+    tabela(ws, 4, ["Hora", "Loja", "NF", "Série", "Fornecedor", "Emissão", "Chegada", "Usuário", "Valor", "Bonificado"],
            [[n["hora"], n["loja"], n["nf"], n["serie"], n["fornecedor"], _data(n["emissao"]), _data(n["chegada"]),
-             n["usuario"], n["valor"]] for n in la], {6: DATA, 7: DATA, 9: MOEDA},
-           total={8: f"Total ({len(la)} notas)", 9: sum(n["valor"] for n in la)})
-    larguras(ws, [8, 20, 13, 7, 45, 12, 12, 30, 16])
+             n["usuario"], n["valor"], n.get("bonificado") or 0] for n in la], {6: DATA, 7: DATA, 9: MOEDA, 10: MOEDA},
+           total={8: f"Total ({len(la)} notas)", 9: sum(n["valor"] for n in la),
+                  10: sum(n.get("bonificado") or 0 for n in la)})
+    larguras(ws, [8, 20, 13, 7, 45, 12, 12, 30, 16, 16])
     ws.freeze_panes = "A5"
 
     # ---------- A lançar / Pendentes ----------
