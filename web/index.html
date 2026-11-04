@@ -61,6 +61,42 @@ h1{font-size:28px;line-height:1.15;margin:4px 0 2px;font-weight:700;letter-spaci
 .btn.ghost{width:30px;border-color:transparent;background:transparent;color:var(--ink-3)}
 .btn.ghost:hover{color:var(--ink);background:var(--surface-2);border-color:transparent}
 
+/* troca entre relatório do dia e dashboard */
+.modos{display:inline-flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:11px;margin-bottom:14px}
+.modos button{border:0;background:transparent;color:var(--ink-2);font:inherit;font-weight:600;font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer}
+.modos button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+body.dash .so-dia{display:none!important}
+body:not(.dash) .so-dash{display:none!important}
+
+/* dashboard */
+#dash .kpi.main .val{font-size:52px;font-variant-numeric:normal}
+.grafico{padding:18px 20px 14px;margin-bottom:14px;position:relative}
+.grafico h2{font-size:15px;font-weight:600;margin:0}
+.grafico .sub-g{color:var(--ink-3);font-size:12.5px;margin:2px 0 10px}
+.grafico svg{display:block;width:100%;overflow:visible}
+.grafico svg text{font-family:inherit;font-size:11px;fill:var(--ink-3)}
+.grafico svg .rot-val{fill:var(--ink-2);font-weight:600}
+.grafico svg .grade{stroke:var(--line);stroke-width:1}
+.grafico svg .barra{fill:var(--accent)}
+.grafico svg .hit{fill:transparent;cursor:default}
+.grafico svg .hit:hover+.barra,.grafico svg .hit:focus+.barra{fill:var(--accent);opacity:.75}
+.grafico svg .hit:focus{outline:none}
+.grafico svg .barra,.grafico svg text{pointer-events:none}
+.lj{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;font-size:13px;color:var(--ink-2);padding:6px 0}
+.lj .trk{height:8px;border-radius:4px;background:var(--bar-track);overflow:hidden}
+.lj .trk span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.lj b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.lj small{color:var(--ink-3);font-weight:400;margin-left:4px}
+.dica{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.16);border-radius:10px;padding:8px 11px;font-size:12.5px;color:var(--ink-2);white-space:nowrap;z-index:5;transform:translate(-50%,-100%);margin-top:-10px}
+.dica b{display:block;color:var(--ink);font-size:13px}
+.dica[hidden]{display:none}
+.grafico details{margin-top:8px;font-size:12.5px}
+.grafico summary{cursor:pointer;color:var(--ink-3);width:max-content}
+.grafico details table{margin-top:8px}
+.grafico details td,.grafico details th{padding:5px 10px}
+.dash-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+@media (max-width:900px){ .dash-grid{grid-template-columns:1fr} }
+
 /* janela de configurações (backup) */
 dialog.cfg{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink);padding:22px 24px 8px;width:min(460px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.25)}
 dialog.cfg::backdrop{background:rgba(10,12,16,.45)}
@@ -284,22 +320,33 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 </head>
 <body>
 <div class="wrap">
+  <div class="modos no-print" role="tablist">
+    <button class="on" data-modo="dia" role="tab">Relatório do dia</button>
+    <button data-modo="dash" role="tab">Dashboard</button>
+  </div>
   <header>
     <div>
       <div class="eyebrow">Controladoria · Entrada de notas</div>
-      <h1>Relatório de notas do dia</h1>
+      <h1 id="titulo">Relatório de notas do dia</h1>
       <div class="sub" id="subtitulo">—</div>
     </div>
     <div class="controls">
-      <div class="datebox">
+      <select class="ctl so-dash" id="d-periodo" title="Período do dashboard">
+        <option value="mes">Este mês</option>
+        <option value="mes-ant">Mês anterior</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="ano">Este ano</option>
+      </select>
+      <div class="datebox so-dia">
         <button class="ctl btn icon" id="prev" title="Dia anterior"><svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
         <input type="date" class="ctl" id="data">
         <button class="ctl btn icon" id="next" title="Próximo dia"><svg class="i" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
-      <button class="ctl btn" id="hoje">Hoje</button>
+      <button class="ctl btn so-dia" id="hoje">Hoje</button>
       <select class="ctl" id="loja"><option value="">Todas as lojas</option></select>
       <button class="ctl btn" id="atualizar" title="Atualizar"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Atualizar</button>
-      <button class="ctl btn" id="excel" title="Baixar o relatório em Excel"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13l4 5M12 13l-4 5"/></svg>Excel</button>
+      <button class="ctl btn so-dia" id="excel" title="Baixar o relatório em Excel"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13l4 5M12 13l-4 5"/></svg>Excel</button>
       <button class="ctl btn primary" id="imprimir"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir / PDF</button>
       <button class="ctl btn ghost" id="config" title="Backup dos dados (exportar / importar)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
@@ -307,7 +354,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 
   <div class="alert" id="alerta"></div>
 
-  <main id="conteudo">
+  <main id="conteudo" class="so-dia">
     <section class="kpis">
       <div class="card kpi main">
         <div class="lbl"><svg class="i" viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>Notas que chegaram hoje</div>
@@ -404,6 +451,44 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       </div>
     </section>
   </main>
+
+  <main id="dash" class="so-dash">
+    <section class="kpis">
+      <div class="card kpi main">
+        <div class="lbl">Notas lançadas no período</div>
+        <div class="val" id="d-total">—</div>
+        <div class="money" id="d-valor">—</div>
+        <div class="foot" style="color:rgba(255,255,255,.85)" id="d-total-f"></div>
+      </div>
+      <div class="card kpi"><div class="lbl"><span class="dot" style="background:var(--accent)"></span>Média por dia</div><div class="val" id="d-media">—</div><div class="money" id="d-media-q"></div><div class="foot" id="d-media-f"></div></div>
+      <div class="card kpi"><div class="lbl"><span class="dot" style="background:var(--warn)"></span>Dia de pico</div><div class="val" id="d-pico">—</div><div class="money" id="d-pico-q"></div><div class="foot" id="d-pico-f"></div></div>
+      <div class="card kpi" title="Dias da emissão da nota até o vencimento de cada título, ponderado pelo valor"><div class="lbl"><span class="dot" style="background:var(--old)"></span>Prazo médio de pagamento</div><div class="val" id="d-prazo">—</div><div class="money" id="d-prazo-q"></div><div class="foot">Da emissão ao vencimento, ponderado pelo valor</div></div>
+      <div class="card kpi" title="Itens com CFOP 1.910/2.910"><div class="lbl"><span class="dot" style="background:var(--ok)"></span>Bonificado no período</div><div class="val" id="d-bonif" style="font-size:26px">—</div><div class="money" id="d-bonif-q"></div><div class="foot" id="d-bonif-f"></div></div>
+    </section>
+
+    <div class="card grafico">
+      <h2>Notas lançadas por dia</h2>
+      <div class="sub-g" id="g-dia-sub"></div>
+      <div id="g-dia"></div>
+      <details><summary>Ver como tabela</summary><div class="tablebox"><table id="t-dia">
+        <thead><tr><th>Dia</th><th>Dia da semana</th><th class="r">Notas</th><th class="r">Valor</th></tr></thead><tbody></tbody></table></div></details>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card grafico">
+        <h2>Notas lançadas por dia da semana</h2>
+        <div class="sub-g">Total no período · passe o mouse para ver a média por dia</div>
+        <div id="g-semana"></div>
+        <details><summary>Ver como tabela</summary><div class="tablebox"><table id="t-semana">
+          <thead><tr><th>Dia da semana</th><th class="r">Notas</th><th class="r">Dias no período</th><th class="r">Média por dia</th></tr></thead><tbody></tbody></table></div></details>
+      </div>
+      <div class="card grafico">
+        <h2>Notas lançadas por loja</h2>
+        <div class="sub-g">Total no período</div>
+        <div id="g-loja"></div>
+      </div>
+    </div>
+  </main>
   <footer id="rodape"></footer>
 </div>
 <div class="tip" id="tip"></div>
@@ -495,7 +580,8 @@ async function init() {
   if (!$('#loja').value) $('#loja').selectedIndex = 0;
   $('#data').value = qs.get('data') || D;
   if (qs.get('aba')) $(`.tab[data-t="${qs.get('aba')}"]`)?.click();
-  carregar();
+  $('#d-periodo').value = store.get('periodo') || 'mes';
+  if (store.get('modo') === 'dash') mudaModo('dash'); else carregar();
 }
 
 const lojaNomeFiltro = () => { const id = $('#loja').value; return id ? LOJAS.find(l => l.id === id).nome : null; };
@@ -951,8 +1037,9 @@ $('#prev').onclick = () => mudaDia(-1);
 $('#next').onclick = () => mudaDia(1);
 $('#hoje').onclick = () => { $('#data').value = hojeISO(); carregar(); };
 $('#data').onchange = carregar;
-$('#loja').onchange = () => { store.set('loja', $('#loja').value); carregar(); };
-$('#atualizar').onclick = carregar;
+$('#loja').onchange = () => { store.set('loja', $('#loja').value); emDash() ? carregarDash() : carregar(); };
+const emDash = () => document.body.classList.contains('dash');
+$('#atualizar').onclick = () => emDash() ? carregarDash() : carregar();
 $('#imprimir').onclick = () => print();
 
 // ---- exportação para Excel (mesmos números da tela) ----
@@ -1015,6 +1102,151 @@ $('#excel').onclick = async () => {
   }
 };
 $('#busca').oninput = () => { renderLancadas(); renderManuais('alancar'); renderManuais('pendente'); };
+
+// ================= Dashboard (notas lançadas no período) =================
+const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0];   // começa na segunda
+const isoLocal = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
+const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate() + n); return isoLocal(d); };
+const diaSemana = iso => new Date(iso + 'T12:00').getDay();
+let dash = null;
+
+function periodoDash(p) {
+  const hoje = hojeISO(), d = new Date(hoje + 'T12:00'), y = d.getFullYear(), m = d.getMonth();
+  if (p === 'mes') return [isoLocal(new Date(y, m, 1, 12)), hoje];
+  if (p === 'mes-ant') return [isoLocal(new Date(y, m - 1, 1, 12)), isoLocal(new Date(y, m, 0, 12))];
+  if (p === 'ano') return [`${y}-01-01`, hoje];
+  return [somaDias(hoje, 1 - Number(p)), hoje];   // últimos N dias, contando hoje
+}
+
+function mudaModo(modo) {
+  document.body.classList.toggle('dash', modo === 'dash');
+  $$('.modos button').forEach(b => b.classList.toggle('on', b.dataset.modo === modo));
+  $('#titulo').textContent = modo === 'dash' ? 'Dashboard de notas lançadas' : 'Relatório de notas do dia';
+  store.set('modo', modo);
+  modo === 'dash' ? carregarDash() : carregar();
+}
+$$('.modos button').forEach(b => b.onclick = () => mudaModo(b.dataset.modo));
+$('#d-periodo').onchange = () => { store.set('periodo', $('#d-periodo').value); carregarDash(); };
+
+async function carregarDash() {
+  const [ini, fim] = periodoDash($('#d-periodo').value), loja = $('#loja').value;
+  $('#subtitulo').textContent = `${dmy(ini)} a ${dmy(fim)} · ${lojaNomeFiltro() || 'Todas as lojas'}`;
+  $('#dash').classList.add('loading');
+  $('#alerta').textContent = '';
+  try {
+    dash = await api(`/api/dashboard?inicio=${ini}&fim=${fim}` + (loja ? `&lojas=${loja}` : ''));
+    if (dash.erros.length) $('#alerta').textContent = 'Não foi possível consultar: ' + dash.erros.map(e => e.loja).join(', ') + '. Os números dessas lojas estão faltando.';
+    renderDash();
+    $('#rodape').textContent = `Atualizado em ${new Date().toLocaleString('pt-BR')} · fonte: SISMOURA (Entrada_Produto, Contas_Pagar)`;
+  } catch (e) {
+    $('#alerta').textContent = 'Erro ao carregar o dashboard: ' + e.message;
+  } finally {
+    $('#dash').classList.remove('loading');
+  }
+}
+
+// Escala "redonda" para o eixo (1, 2, 5, 10, 20, 50…), nunca menor que 1 nota
+function passoBonito(v) {
+  const p = 10 ** Math.floor(Math.log10(Math.max(v, 1)));
+  return Math.max(1, [1, 2, 5, 10].map(m => m * p).find(s => s >= v));
+}
+// Coluna com topo arredondado (4px) e base reta, crescendo da linha de base
+function colunaPath(x, y, w, h) {
+  const r = Math.min(4, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+// Gráfico de colunas de série única. itens: [{rot, valor, dica}]; só o maior valor ganha rótulo
+function colunas(el, itens, {altura = 220, nome = ''} = {}) {
+  const L = Math.max(280, el.clientWidth), M = {e: 40, d: 6, t: 20, b: 24};
+  const w = L - M.e - M.d, h = altura - M.t - M.b;
+  const max = Math.max(0, ...itens.map(i => i.valor));
+  const passo = passoBonito(max / 4), topo = Math.max(passo, Math.ceil(max / passo) * passo);
+  const banda = w / itens.length, larg = Math.max(2, Math.min(24, banda - 2));
+  const y = v => M.t + h - v / topo * h;
+  let s = '';
+  for (let v = 0; v <= topo + 1e-9; v += passo) {
+    s += `<line class="grade" x1="${M.e}" x2="${L - M.d}" y1="${y(v)}" y2="${y(v)}"/><text x="${M.e - 8}" y="${y(v) + 4}" text-anchor="end">${INT.format(v)}</text>`;
+  }
+  const cada = Math.max(1, Math.ceil(44 / banda));   // rótulos do eixo X com pelo menos ~44px entre si
+  const iMax = itens.reduce((b, it, i) => it.valor > itens[b].valor ? i : b, 0);
+  itens.forEach((it, i) => {
+    const cx = M.e + banda * i + banda / 2, topoBarra = y(it.valor), alt = M.t + h - topoBarra;
+    s += `<rect class="hit" x="${M.e + banda * i}" y="${M.t}" width="${banda}" height="${h}" tabindex="0" data-i="${i}" aria-label="${esc(it.dica.replace(/<[^>]+>/g, ' '))}"/>`;
+    s += `<path class="barra" d="${alt > 0 ? colunaPath(cx - larg / 2, topoBarra, larg, alt) : ''}"/>`;
+    if (i % cada === 0) s += `<text x="${cx}" y="${altura - 6}" text-anchor="middle">${esc(it.rot)}</text>`;
+    if (i === iMax && it.valor > 0) s += `<text class="rot-val" x="${cx}" y="${topoBarra - 6}" text-anchor="middle">${INT.format(it.valor)}</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${L} ${altura}" height="${altura}" role="img" aria-label="${esc(nome)}">${s}</svg>`;
+  const dica = el.closest('.grafico').querySelector('.dica') || el.closest('.grafico').appendChild(Object.assign(document.createElement('div'), {className: 'dica', hidden: true}));
+  el.querySelectorAll('.hit').forEach(r => {
+    const i = +r.dataset.i, it = itens[i];
+    r.onmouseenter = r.onfocus = () => {
+      dica.innerHTML = it.dica; dica.hidden = false;
+      dica.style.left = (el.offsetLeft + M.e + banda * i + banda / 2) + 'px';
+      dica.style.top = (el.offsetTop + y(it.valor)) + 'px';
+    };
+    r.onmouseleave = r.onblur = () => { dica.hidden = true; };
+  });
+}
+
+function renderDash() {
+  if (!dash) return;
+  const porDia = Object.fromEntries(dash.dias.map(d => [d.dia, d]));
+  const dias = [];
+  for (let d = dash.inicio; d <= dash.fim; d = somaDias(d, 1)) {
+    dias.push({dia: d, dow: diaSemana(d), notas: porDia[d]?.notas || 0, valor: porDia[d]?.valor || 0});
+  }
+  const total = dias.reduce((s, d) => s + d.notas, 0), valor = dias.reduce((s, d) => s + d.valor, 0);
+  const comLanc = dias.filter(d => d.notas > 0);
+  const pico = dias.reduce((b, d) => d.notas > b.notas ? d : b, dias[0]);
+
+  // cards
+  $('#d-total').textContent = INT.format(total);
+  $('#d-valor').textContent = BRL.format(valor) + ' lançados';
+  $('#d-total-f').innerHTML = total ? `Valor médio por nota: <b>${BRL.format(valor / total)}</b>` : '';
+  const media = comLanc.length ? total / comLanc.length : 0;
+  $('#d-media').textContent = media.toLocaleString('pt-BR', {maximumFractionDigits: 1});
+  $('#d-media-q').textContent = 'notas por dia com lançamento';
+  $('#d-media-f').innerHTML = `<b>${comLanc.length}</b> de ${dias.length} dias com lançamento`;
+  $('#d-pico').textContent = pico && pico.notas ? INT.format(pico.notas) : '—';
+  $('#d-pico-q').textContent = pico && pico.notas ? 'notas' : '';
+  $('#d-pico-f').innerHTML = pico && pico.notas ? `${DIAS_SEMANA[pico.dow]}, <b>${dmy(pico.dia)}</b> · ${BRL.format(pico.valor)}` : 'Nenhuma nota no período';
+  $('#d-prazo').textContent = dash.prazo_medio == null ? '—' : dash.prazo_medio.toLocaleString('pt-BR', {maximumFractionDigits: 1});
+  $('#d-prazo-q').textContent = dash.prazo_medio == null ? 'sem títulos no período' : 'dias';
+  $('#d-bonif').textContent = BRL.format(dash.bonificado);
+  $('#d-bonif-q').textContent = `${INT.format(dash.notas_bonificadas)} nota${dash.notas_bonificadas === 1 ? '' : 's'} com bonificação`;
+  $('#d-bonif-f').innerHTML = valor ? `<b>${(dash.bonificado / valor * 100).toLocaleString('pt-BR', {maximumFractionDigits: 1})}%</b> do valor lançado` : '';
+
+  // por dia
+  $('#g-dia-sub').textContent = `${dmy(dash.inicio)} a ${dmy(dash.fim)} · passe o mouse sobre uma coluna para ver o detalhe`;
+  colunas($('#g-dia'), dias.map(d => ({
+    rot: dm(d.dia), valor: d.notas,
+    dica: `<b>${DIAS_SEMANA[d.dow]}, ${dmy(d.dia)}</b>${INT.format(d.notas)} nota${d.notas === 1 ? '' : 's'} · ${BRL.format(d.valor)}`,
+  })), {nome: 'Notas lançadas por dia'});
+  $('#t-dia tbody').innerHTML = dias.map(d => `<tr><td class="num">${dmy(d.dia)}</td><td>${DIAS_SEMANA[d.dow]}</td><td class="r num">${INT.format(d.notas)}</td><td class="r num">${BRL.format(d.valor)}</td></tr>`).join('');
+
+  // por dia da semana (total; a média considera quantas vezes cada dia aparece no período)
+  const sem = ORDEM_SEMANA.map(dow => {
+    const ds = dias.filter(d => d.dow === dow), n = ds.reduce((s, d) => s + d.notas, 0);
+    return {dow, notas: n, ocorr: ds.length, media: ds.length ? n / ds.length : 0};
+  });
+  colunas($('#g-semana'), sem.map(s => ({
+    rot: DIAS_SEMANA[s.dow].slice(0, 3), valor: s.notas,
+    dica: `<b>${DIAS_SEMANA[s.dow]}</b>${INT.format(s.notas)} notas · média de ${s.media.toLocaleString('pt-BR', {maximumFractionDigits: 1})} por ${DIAS_SEMANA[s.dow].toLowerCase()} (${s.ocorr} no período)`,
+  })), {altura: 200, nome: 'Notas lançadas por dia da semana'});
+  $('#t-semana tbody').innerHTML = sem.map(s => `<tr><td>${DIAS_SEMANA[s.dow]}</td><td class="r num">${INT.format(s.notas)}</td><td class="r num">${s.ocorr}</td><td class="r num">${s.media.toLocaleString('pt-BR', {maximumFractionDigits: 1})}</td></tr>`).join('');
+
+  // por loja (barras horizontais, maior primeiro)
+  const lojas = Object.entries(dash.por_loja).sort((a, b) => b[1] - a[1]);
+  const maiorLoja = Math.max(1, ...lojas.map(([, n]) => n));
+  $('#g-loja').innerHTML = lojas.map(([nome, n]) => `<div class="lj"><span>${esc(nome)}</span><span class="trk"><span style="width:${n / maiorLoja * 100}%"></span></span>`
+    + `<b>${INT.format(n)}<small>${total ? Math.round(n / total * 100) + '%' : ''}</small></b></div>`).join('') || '<div class="tit-vazio">Sem dados</div>';
+}
+
+let redimensiona;
+window.addEventListener('resize', () => { clearTimeout(redimensiona); redimensiona = setTimeout(() => emDash() && renderDash(), 150); });
 
 init();
 </script>

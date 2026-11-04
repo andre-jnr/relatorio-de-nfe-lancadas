@@ -320,6 +320,70 @@ def api_lancadas():
     return jsonify({"data": dia.isoformat(), "notas": notas, "erros": erros})
 
 
+# ---------- dashboard (período) ----------
+
+SQL_DASH_DIAS = """
+SELECT CONVERT(date, Data_Cadastro) AS Dia, COUNT(*) AS Notas, SUM(Valor_Nota) AS Valor
+FROM Entrada_Produto
+WHERE Data_Cadastro >= ? AND Data_Cadastro < ?
+GROUP BY CONVERT(date, Data_Cadastro)
+"""
+
+# Prazo médio de pagamento (dias da emissão ao vencimento), ponderado pelo valor de cada título
+SQL_DASH_PRAZO = """
+SELECT SUM(cp.Valor * DATEDIFF(day, e.Data_Emissao, cp.Data_Vencimento)) AS Valor_x_Prazo, SUM(cp.Valor) AS Valor
+FROM Contas_Pagar cp
+JOIN Entrada_Produto e ON e.Chave = cp.Codigo_Entrada
+WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ? AND cp.Data_Exclusao IS NULL AND e.Data_Emissao IS NOT NULL
+"""
+
+SQL_DASH_BONIF = """
+SELECT SUM(i.Valor_Total) AS Bonificado, COUNT(DISTINCT i.Chave) AS Notas
+FROM Entrada_Produto_Itens i
+JOIN Entrada_Produto e ON e.Chave = i.Chave
+WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ? AND REPLACE(i.CFOP, '.', '') IN ('1910', '2910')
+"""
+
+
+@app.get("/api/dashboard")
+def api_dashboard():
+    """Notas lançadas por dia no período [inicio, fim] (datas inclusivas), somando as lojas pedidas."""
+    try:
+        inicio = date.fromisoformat(request.args["inicio"])
+        fim = date.fromisoformat(request.args["fim"])
+    except (KeyError, ValueError):
+        return jsonify({"erro": "informe inicio e fim (AAAA-MM-DD)"}), 400
+    if fim < inicio or (fim - inicio).days > 400:
+        return jsonify({"erro": "período inválido (máximo de 400 dias)"}), 400
+    lojas = [l for l in request.args.get("lojas", ",".join(LOJAS)).split(",") if l in LOJAS]
+    periodo = (datetime.combine(inicio, datetime.min.time()), datetime.combine(fim + timedelta(days=1), datetime.min.time()))
+
+    res, erros = em_paralelo(lambda l: consultar_varias(
+        l, (SQL_DASH_DIAS, periodo), (SQL_DASH_PRAZO, periodo), (SQL_DASH_BONIF, periodo)), lojas)
+
+    dias, por_loja = {}, {}
+    valor_x_prazo = valor_titulos = bonificado = notas_bonif = 0.0
+    for loja, (linhas, prazo, bonif) in res.items():
+        por_loja[LOJAS[loja]] = sum(r["Notas"] for r in linhas)
+        for r in linhas:
+            d = dias.setdefault(r["Dia"].isoformat() if hasattr(r["Dia"], "isoformat") else str(r["Dia"])[:10],
+                                {"notas": 0, "valor": 0.0})
+            d["notas"] += r["Notas"]
+            d["valor"] += float(r["Valor"] or 0)
+        valor_x_prazo += float(prazo[0]["Valor_x_Prazo"] or 0)
+        valor_titulos += float(prazo[0]["Valor"] or 0)
+        bonificado += float(bonif[0]["Bonificado"] or 0)
+        notas_bonif += bonif[0]["Notas"] or 0
+    return jsonify({
+        "inicio": inicio.isoformat(), "fim": fim.isoformat(),
+        "dias": [{"dia": k, **v} for k, v in sorted(dias.items())],
+        "por_loja": por_loja,
+        "prazo_medio": round(valor_x_prazo / valor_titulos, 1) if valor_titulos else None,
+        "bonificado": bonificado, "notas_bonificadas": int(notas_bonif),
+        "erros": erros,
+    })
+
+
 @app.get("/api/lojas")
 def api_lojas():
     return jsonify([{"id": k, "nome": v} for k, v in LOJAS.items()])
