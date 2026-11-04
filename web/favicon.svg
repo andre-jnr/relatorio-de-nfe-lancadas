@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Nota fiscal: folha com canto dobrado, linhas e borda picotada, na cor de destaque do relatório -->
+  <rect width="32" height="32" rx="7" fill="#2f5bea"/>
+  <path d="M8.5 5.5h10.5l5.5 5.5v15.5l-2.67-1.6-2.66 1.6-2.67-1.6-2.67 1.6-2.66-1.6-2.67 1.6z" fill="#fff"/>
+  <path d="M19 5.5v5.5h5.5z" fill="#b9c8f8"/>
+  <path d="M12 14.5h8.5M12 18h8.5M12 21.5h5" stroke="#2f5bea" stroke-width="1.9" stroke-linecap="round"/>
+</svg>

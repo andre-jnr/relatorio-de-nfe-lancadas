@@ -760,6 +760,12 @@ def index():
     return send_from_directory(BASE / "web", "index.html")
 
 
+@app.get("/favicon.svg")
+@app.get("/favicon.ico")  # alguns navegadores pedem este caminho direto
+def favicon():
+    return send_from_directory(BASE / "web", "favicon.svg", mimetype="image/svg+xml")
+
+
 PORTA_OCUPADA = 3  # código de saída usado por servidor/iniciar.ps1 para não ficar tentando de novo
 
 
