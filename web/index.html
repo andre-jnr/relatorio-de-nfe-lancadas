@@ -95,6 +95,8 @@ body:not(.dash) .so-dash{display:none!important}
 .grafico details table{margin-top:8px}
 .grafico details td,.grafico details th{padding:5px 10px}
 .dash-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+#dash .kpis.duas{grid-template-columns:1fr 1fr}
+#dash .kpis.duas .val{font-size:30px}
 @media (max-width:900px){ .dash-grid{grid-template-columns:1fr} }
 
 /* janela de configurações (backup) */
@@ -331,13 +333,8 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       <div class="sub" id="subtitulo">—</div>
     </div>
     <div class="controls">
-      <select class="ctl so-dash" id="d-periodo" title="Período do dashboard">
-        <option value="mes">Este mês</option>
-        <option value="mes-ant">Mês anterior</option>
-        <option value="30">Últimos 30 dias</option>
-        <option value="90">Últimos 90 dias</option>
-        <option value="ano">Este ano</option>
-      </select>
+      <select class="ctl so-dash" id="d-mes" title="Mês do dashboard"></select>
+      <select class="ctl so-dash" id="d-ano" title="Ano do dashboard"></select>
       <div class="datebox so-dia">
         <button class="ctl btn icon" id="prev" title="Dia anterior"><svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
         <input type="date" class="ctl" id="data">
@@ -466,6 +463,17 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       <div class="card kpi" title="Itens com CFOP 1.910/2.910"><div class="lbl"><span class="dot" style="background:var(--ok)"></span>Bonificado no período</div><div class="val" id="d-bonif" style="font-size:26px">—</div><div class="money" id="d-bonif-q"></div><div class="foot" id="d-bonif-f"></div></div>
     </section>
 
+    <section class="kpis duas">
+      <div class="card kpi" title="Dia da semana com a maior média de notas lançadas por dia no período">
+        <div class="lbl"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M7 17L17 7M9 7h8v8"/></svg>Dia da semana com mais entradas</div>
+        <div class="val" id="d-smais">—</div><div class="money" id="d-smais-q"></div><div class="foot" id="d-smais-f"></div>
+      </div>
+      <div class="card kpi" title="Dia da semana com a menor média de notas lançadas por dia (entre os que tiveram lançamento)">
+        <div class="lbl"><svg class="i" viewBox="0 0 24 24" style="color:var(--warn)"><path d="M7 7l10 10M17 9v8H9"/></svg>Dia da semana com menos entradas</div>
+        <div class="val" id="d-smenos">—</div><div class="money" id="d-smenos-q"></div><div class="foot" id="d-smenos-f"></div>
+      </div>
+    </section>
+
     <div class="card grafico">
       <h2>Notas lançadas por dia</h2>
       <div class="sub-g" id="g-dia-sub"></div>
@@ -580,7 +588,7 @@ async function init() {
   if (!$('#loja').value) $('#loja').selectedIndex = 0;
   $('#data').value = qs.get('data') || D;
   if (qs.get('aba')) $(`.tab[data-t="${qs.get('aba')}"]`)?.click();
-  $('#d-periodo').value = store.get('periodo') || 'mes';
+  montarPeriodoDash();
   if (store.get('modo') === 'dash') mudaModo('dash'); else carregar();
 }
 
@@ -1111,13 +1119,33 @@ const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00'); d.setDate(d.g
 const diaSemana = iso => new Date(iso + 'T12:00').getDay();
 let dash = null;
 
-function periodoDash(p) {
-  const hoje = hojeISO(), d = new Date(hoje + 'T12:00'), y = d.getFullYear(), m = d.getMonth();
-  if (p === 'mes') return [isoLocal(new Date(y, m, 1, 12)), hoje];
-  if (p === 'mes-ant') return [isoLocal(new Date(y, m - 1, 1, 12)), isoLocal(new Date(y, m, 0, 12))];
-  if (p === 'ano') return [`${y}-01-01`, hoje];
-  return [somaDias(hoje, 1 - Number(p)), hoje];   // últimos N dias, contando hoje
+// Período = mês e ano escolhidos (ou o ano inteiro). Sempre abre no mês e ano atuais.
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const ANOS_ATRAS = 4;   // quantos anos anteriores aparecem no filtro
+
+function montarPeriodoDash() {
+  const [y, m] = hojeISO().split('-').map(Number);
+  $('#d-ano').innerHTML = Array.from({length: ANOS_ATRAS + 1}, (_, i) => `<option>${y - i}</option>`).join('');
+  $('#d-ano').value = y;
+  atualizarMesesDash();
+  $('#d-mes').value = m;
 }
+
+// No ano atual, os meses que ainda não chegaram ficam desabilitados
+function atualizarMesesDash() {
+  const [yHoje, mHoje] = hojeISO().split('-').map(Number), ano = Number($('#d-ano').value), atual = $('#d-mes').value;
+  $('#d-mes').innerHTML = '<option value="0">Ano inteiro</option>' + MESES.map((nome, i) =>
+    `<option value="${i + 1}"${ano === yHoje && i + 1 > mHoje ? ' disabled' : ''}>${nome}</option>`).join('');
+  $('#d-mes').value = $(`#d-mes option[value="${atual}"]:not([disabled])`) ? atual : (ano === yHoje ? mHoje : 0);
+}
+
+function periodoDash() {
+  const hoje = hojeISO(), ano = Number($('#d-ano').value), mes = Number($('#d-mes').value);
+  const ini = mes ? `${ano}-${String(mes).padStart(2, '0')}-01` : `${ano}-01-01`;
+  const fim = mes ? isoLocal(new Date(ano, mes, 0, 12)) : `${ano}-12-31`;   // dia 0 do mês seguinte = último dia
+  return [ini, fim > hoje ? hoje : fim];   // não passa de hoje
+}
+const nomePeriodo = () => (Number($('#d-mes').value) ? MESES[$('#d-mes').value - 1] + ' de ' : 'Ano de ') + $('#d-ano').value;
 
 function mudaModo(modo) {
   document.body.classList.toggle('dash', modo === 'dash');
@@ -1127,11 +1155,12 @@ function mudaModo(modo) {
   modo === 'dash' ? carregarDash() : carregar();
 }
 $$('.modos button').forEach(b => b.onclick = () => mudaModo(b.dataset.modo));
-$('#d-periodo').onchange = () => { store.set('periodo', $('#d-periodo').value); carregarDash(); };
+$('#d-mes').onchange = carregarDash;
+$('#d-ano').onchange = () => { atualizarMesesDash(); carregarDash(); };
 
 async function carregarDash() {
-  const [ini, fim] = periodoDash($('#d-periodo').value), loja = $('#loja').value;
-  $('#subtitulo').textContent = `${dmy(ini)} a ${dmy(fim)} · ${lojaNomeFiltro() || 'Todas as lojas'}`;
+  const [ini, fim] = periodoDash(), loja = $('#loja').value;
+  $('#subtitulo').textContent = `${nomePeriodo()} (${dmy(ini)} a ${dmy(fim)}) · ${lojaNomeFiltro() || 'Todas as lojas'}`;
   $('#dash').classList.add('loading');
   $('#alerta').textContent = '';
   try {
@@ -1236,6 +1265,21 @@ function renderDash() {
     rot: DIAS_SEMANA[s.dow].slice(0, 3), valor: s.notas,
     dica: `<b>${DIAS_SEMANA[s.dow]}</b>${INT.format(s.notas)} notas · média de ${s.media.toLocaleString('pt-BR', {maximumFractionDigits: 1})} por ${DIAS_SEMANA[s.dow].toLowerCase()} (${s.ocorr} no período)`,
   })), {altura: 200, nome: 'Notas lançadas por dia da semana'});
+  // mais e menos entradas pela média por dia (justo quando o período tem, por exemplo, 5 sextas e 4 segundas);
+  // dias da semana sem nenhum lançamento (ex.: domingo) não concorrem ao "menos"
+  const media1 = v => v.toLocaleString('pt-BR', {maximumFractionDigits: 1});
+  const comNotas = sem.filter(s => s.notas > 0), semNotas = sem.filter(s => s.ocorr && !s.notas);
+  const mais = comNotas.reduce((b, s) => !b || s.media > b.media ? s : b, null);
+  const menos = comNotas.reduce((b, s) => !b || s.media < b.media ? s : b, null);
+  const cardSemana = (id, s, extra = '') => {
+    $(`#d-${id}`).textContent = s ? DIAS_SEMANA[s.dow] : '—';
+    $(`#d-${id}-q`).textContent = s ? `média de ${media1(s.media)} notas por dia` : 'sem lançamentos no período';
+    $(`#d-${id}-f`).innerHTML = s ? `<b>${INT.format(s.notas)}</b> notas em ${s.ocorr} ${DIAS_SEMANA[s.dow].toLowerCase()}${s.ocorr > 1 ? 's' : ''} do período` + extra : '';
+  };
+  cardSemana('smais', mais);
+  cardSemana('smenos', menos === mais && comNotas.length < 2 ? null : menos,
+    semNotas.length ? ` · sem lançamento: ${semNotas.map(s => DIAS_SEMANA[s.dow].toLowerCase()).join(', ')}` : '');
+
   $('#t-semana tbody').innerHTML = sem.map(s => `<tr><td>${DIAS_SEMANA[s.dow]}</td><td class="r num">${INT.format(s.notas)}</td><td class="r num">${s.ocorr}</td><td class="r num">${s.media.toLocaleString('pt-BR', {maximumFractionDigits: 1})}</td></tr>`).join('');
 
   // por loja (barras horizontais, maior primeiro)
