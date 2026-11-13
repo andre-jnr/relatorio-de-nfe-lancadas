@@ -290,6 +290,7 @@ td select.vazio{color:var(--bad);border-color:var(--bad-soft)}
 
 footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 .print-only{display:none}
+.papel{display:none}
 
 @media (max-width:1100px){
   .kpis{grid-template-columns:repeat(4,1fr)}
@@ -323,29 +324,77 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   .print-only{display:block}
   .view{display:block!important;margin-top:0}
   .view h3.print-only{font-size:13px;margin:16px 0 6px}
-  .kpis{grid-template-columns:1.55fr repeat(4,1fr)}
+  /* A largura útil do A4 é ~703px: tudo precisa caber nela, senão o navegador encolhe a página inteira */
+  .kpis{grid-template-columns:1.3fr repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+  .kpi{padding:10px 11px}
+  .kpi .lbl{font-size:10.5px;gap:5px}
+  .kpi .val{font-size:24px;margin:3px 0 1px}
+  .kpi .money{font-size:10.5px}
+  .kpi .foot{font-size:9.5px;padding-top:6px}
+  .orow{font-size:10px;column-gap:5px}
+  .orow small{font-size:9.5px}
+  .legend{font-size:10px;gap:8px}
   .kpi.main{grid-column:auto;background:#fff;color:var(--ink);border:2px solid var(--accent)}
   .kpi.main .lbl,.kpi.main .money,.legend{color:var(--ink-2)}
   .split{background:var(--bar-track)}
   .split .s1{background:var(--accent)} .split .s2{background:var(--warn)}
-  .kpi.main .val{font-size:34px}
-  .card{break-inside:avoid}
-  .grid2{grid-template-columns:1.3fr 1fr}
-  td input,td select{border:0;padding:0;appearance:none}
-  .kpis.cp{grid-template-columns:1fr 1fr 1fr}   /* na folha A4 os 3 cards financeiros cabem lado a lado */
+  .kpi.main .val{font-size:30px}
+  /* quebra de página: cards pequenos ficam inteiros; o bloco das tabelas pode continuar na folha seguinte
+     (antes ele pulava inteiro de página e deixava meia folha em branco) */
+  .kpi,.grid2 .panel{break-inside:avoid}
+  #sec-tabelas{break-inside:auto;padding:0;border:0;background:none}   /* sem moldura: não sobra caixa vazia no pé da folha */
+  tr,.tit-box{break-inside:avoid}
+  tr.aberta{break-after:avoid}                 /* nota e suas contas a pagar na mesma folha */
+  .view h3.print-only{break-after:avoid}       /* título nunca sozinho no pé da página */
+  thead{display:table-header-group}            /* cabeçalho repete em cada folha */
+  .grid2{grid-template-columns:1fr;gap:10px;margin-bottom:10px}   /* usuários e lojas um embaixo do outro */
+  .panel{padding:12px 14px}
+  .panel h2{font-size:12.5px}
+  .panel .hint{font-size:10px;margin-bottom:6px}
+  /* lançamentos por usuário compactos: nome + lojas numa linha, barra fina, valor ao lado */
+  .urow{grid-template-columns:minmax(150px,250px) 1fr auto;gap:10px;padding:2px 0;font-size:10.5px}
+  .urow .ulojas{display:inline;margin-left:6px;font-size:9.5px}
+  .urow .uname{display:inline}
+  .track{height:8px;border-radius:4px}
+  .uval{min-width:90px}
+  .uval b{font-size:11px}
+  .uval span{display:inline;margin-left:6px;font-size:9.5px}
+  /* campos editáveis viram texto: no papel o texto quebra linha em vez de ser cortado */
+  td input,td select{display:none!important}
+  .papel{display:inline}
+  .view.manual th{width:auto!important}
+  /* coluna dos botões: só nas linhas de nota (títulos de grupo e "nenhuma nota" têm uma célula só) */
+  .view.manual th:last-child,.view.manual tr[data-id] td:last-child{display:none}
+  .view.manual td{font-size:inherit!important}
+  /* tabelas mais densas */
+  table{font-size:9.5px}
+  th{font-size:8.5px;padding:4px 5px}
+  td{padding:4px 5px}
+  .col-usu .pill{display:none}                 /* no papel vai o nome curto (.papel) */
+  .col-usu .papel,#b-lancadas tr.nota td:nth-child(3){white-space:nowrap}
+  #b-lancadas .pill.old{padding:0 4px;font-size:8.5px}
+  /* contas a pagar expandidas: quadro compacto, no mesmo tamanho de letra da tabela */
+  tr.det td{padding:0 5px 5px}
+  .tit-box{padding:0 2px;border-radius:6px}
+  .tit-box table{min-width:0}
+  .tit-box th,.tit-box td{font-size:8.5px;padding:1px 8px}
+  .tit-box .pill{font-size:7.5px;padding:0 4px}
+  .tit-dif{font-size:8.5px}
+  .pr-sem-usu .col-usu{display:none!important}   /* "Lançamentos por usuário" desmarcado */
+  .kpis.cp{grid-template-columns:repeat(3,minmax(0,1fr))}   /* na folha A4 os 3 cards financeiros cabem lado a lado */
   .kpis.cp .bonif{grid-column:auto}
-  .kpis.cp .val{font-size:22px}
+  .kpis.cp .val{font-size:20px}
+  .mes{font-size:10px}
   .mes{grid-template-columns:1fr auto}   /* no papel: só mês e valor, sem a barrinha */
   .mes .trk{display:none}
   /* tabelas cabem na largura da folha: nada de rolagem lateral cortando a coluna de valor */
   .tablebox{overflow:visible}
-  th,td{padding:5px 6px}
   th{letter-spacing:.02em}
   .exp-cel{width:26px;padding-right:0}
   .exp{padding:0;gap:0}
-  .pill{white-space:normal;padding:1px 6px}
+  .pill{padding:1px 5px;font-size:8.5px}
+  .view.manual td:first-child .papel{white-space:nowrap}   /* loja numa linha só */
   .pr-oculto{display:none!important}   /* partes desmarcadas na janela de impressão */
-  .grid2:has(> .pr-oculto){grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -451,7 +500,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
         <h3 class="print-only">Notas lançadas</h3>
         <div class="filtro-ativo" id="filtro-cp" hidden>Mostrando só as notas com <span class="pill" id="filtro-cp-txt"></span><button class="no-print" id="filtro-cp-limpar">limpar filtro</button></div>
         <div class="tablebox"><table>
-          <thead><tr><th class="exp-cel"><button class="exp no-print" id="exp-todas" title="Expandir / recolher as contas a pagar de todas as notas"></button></th><th>Hora</th><th>Loja</th><th>NF</th><th>Fornecedor</th><th>Emissão</th><th>Usuário</th><th class="r">Valor</th></tr></thead>
+          <thead><tr><th class="exp-cel"><button class="exp no-print" id="exp-todas" title="Expandir / recolher as contas a pagar de todas as notas"></button></th><th>Hora</th><th>Loja</th><th>NF</th><th>Fornecedor</th><th>Emissão</th><th class="col-usu">Usuário</th><th class="r">Valor</th></tr></thead>
           <tbody id="b-lancadas"></tbody>
         </table></div>
       </div>
@@ -541,7 +590,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
     <label><input type="checkbox" name="parte" value="financeiro"> Financeiro <small>a pagar deste mês, próximos meses, bonificado do dia</small></label>
   </fieldset>
   <fieldset><legend>Resumos</legend>
-    <label><input type="checkbox" name="parte" value="usuarios"> Lançamentos por usuário</label>
+    <label><input type="checkbox" name="parte" value="usuarios"> Lançamentos por usuário <small>desmarcado, some também a coluna Usuário das notas lançadas</small></label>
     <label><input type="checkbox" name="parte" value="lojas"> Resumo por loja</label>
   </fieldset>
   <fieldset><legend>Tabelas</legend>
@@ -860,6 +909,8 @@ function renderContasAPagar() {
 // ---- contas a pagar de cada nota lançada (expandir) ----
 const abertas = new Set();   // notas expandidas: "loja|chave da entrada"
 const chaveNota = n => n.loja + '|' + n.chave;
+// Primeiro e último nome (usado na impressão, onde o nome completo quebra a linha da tabela)
+const nomeCurto = nome => { const p = String(nome || '').trim().split(/\s+/); return p.length > 2 ? p[0] + ' ' + p[p.length - 1] : p.join(' '); };
 const lancadasVisiveis = () => lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' '))
   && (!filtroCP || (filtroCP === 'bonif' ? n.bonificado > 0 : n.titulos.some(t => faixaTitulo(t) === filtroCP))));
 
@@ -909,7 +960,7 @@ function renderLancadas() {
       !n.bonificado ? '' : n.bonificado >= n.valor - 0.01
         ? ' <span class="pill ok" title="Todos os itens com CFOP de bonificação">bonificação</span>'
         : ` <span class="pill ok" title="Parte dos itens é bonificação (CFOP 1.910/2.910)">bonif. ${BRL.format(n.bonificado)}</span>`}</td><td class="num">${n.emissao}</td>
-    <td><span class="pill">${esc(n.usuario)}</span></td><td class="r num">${BRL.format(n.valor)}</td></tr>`
+    <td class="col-usu"><span class="pill">${esc(n.usuario)}</span><span class="papel" title="${esc(n.usuario)}">${esc(nomeCurto(n.usuario))}</span></td><td class="r num">${BRL.format(n.valor)}</td></tr>`
       + (aberta ? `<tr class="det"><td></td><td colspan="7">${detalheTitulos(n)}</td></tr>` : '');
   }).join('')
     : `<tr><td colspan="8" class="empty">${lancadas.length ? 'Nada encontrado na busca.' : 'Nenhuma nota lançada nesta data.'}</td></tr>`;
@@ -927,13 +978,16 @@ function linhaManual(m) {
   const done = fechada(m);
   const lojaOpts = `<option value="">— definir —</option>` + LOJAS.map(l => `<option ${l.nome === m.loja ? 'selected' : ''}>${esc(l.nome)}</option>`).join('');
   const outro = m.tipo === 'alancar' ? 'pendentes' : 'a lançar';
+  // .papel: o mesmo valor em texto, que só aparece na impressão (campo de formulário não quebra linha no papel)
+  const papel = v => `<span class="papel">${esc(v)}</span>`;
+  const valor = Number(m.valor).toLocaleString('pt-BR', {minimumFractionDigits:2});
   return `<tr data-id="${m.id}" class="${done ? 'done' : ''}">
-    <td><select data-f="loja" class="${m.loja ? '' : 'vazio'}">${lojaOpts}</select></td>
-    <td><input data-f="nf" class="num" value="${esc(m.nf)}" title="${m.chave ? 'Chave: ' + esc(m.chave) : ''}"></td>
-    <td><div style="display:flex;align-items:center"><input data-f="fornecedor" value="${esc(m.fornecedor)}">${m.origem === 'xml' ? '<span class="pill xml" title="Importada de XML">XML</span>' : ''}</div></td>
+    <td><select data-f="loja" class="${m.loja ? '' : 'vazio'}">${lojaOpts}</select>${papel(m.loja || 'sem loja')}</td>
+    <td><input data-f="nf" class="num" value="${esc(m.nf)}" title="${m.chave ? 'Chave: ' + esc(m.chave) : ''}">${papel(m.nf)}</td>
+    <td><div style="display:flex;align-items:center"><input data-f="fornecedor" value="${esc(m.fornecedor)}">${papel(m.fornecedor)}${m.origem === 'xml' ? '<span class="pill xml" title="Importada de XML">XML</span>' : ''}</div></td>
     <td class="num" style="font-size:12.5px">${m.emissao ? dm(m.emissao) + '/' + m.emissao.slice(2,4) : ''}</td>
-    <td><input data-f="valor" class="num" value="${esc(Number(m.valor).toLocaleString('pt-BR', {minimumFractionDigits:2}))}"></td>
-    ${m.tipo === 'pendente' ? `<td><input data-f="motivo" value="${esc(m.motivo)}" placeholder="Informe o motivo"></td>` : ''}
+    <td class="r"><input data-f="valor" class="num" value="${esc(valor)}">${papel(valor)}</td>
+    ${m.tipo === 'pendente' ? `<td><input data-f="motivo" value="${esc(m.motivo)}" placeholder="Informe o motivo">${papel(m.motivo)}</td>` : ''}
     <td>${situacao(m)}</td>
     <td><div class="acts">
       ${m.lancada_em && m.lancada_em <= D ? '' : done
@@ -1131,6 +1185,7 @@ $('#imp-ok').onclick = () => {
   const partes = partesMarcadas(), contas = $('#imp-contas').checked && partes.includes('t-lancadas');
   store.set('impressao', JSON.stringify({partes, contas: $('#imp-contas').checked}));
   $$('[data-imprimir]').forEach(el => el.classList.toggle('pr-oculto', !partes.includes(el.dataset.imprimir)));
+  document.body.classList.toggle('pr-sem-usu', !partes.includes('usuarios'));   // some também a coluna Usuário
   $('#sec-paineis').classList.toggle('pr-oculto', !partes.includes('usuarios') && !partes.includes('lojas'));
   $('#sec-tabelas').classList.toggle('pr-oculto', !partes.some(p => p.startsWith('t-')));
   // expande temporariamente as contas a pagar de todas as notas e volta ao estado da tela depois
@@ -1138,6 +1193,7 @@ $('#imp-ok').onclick = () => {
   if (contas) { lancadasVisiveis().forEach(n => abertas.add(chaveNota(n))); renderLancadas(); }
   window.addEventListener('afterprint', () => {
     $$('.pr-oculto').forEach(el => el.classList.remove('pr-oculto'));
+    document.body.classList.remove('pr-sem-usu');
     if (antes) { abertas.clear(); antes.forEach(k => abertas.add(k)); renderLancadas(); }
   }, {once: true});
   $('#imp').close();
