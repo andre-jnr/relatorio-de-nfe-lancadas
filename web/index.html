@@ -110,6 +110,20 @@ dialog.cfg::backdrop{background:rgba(10,12,16,.45)}
 .cfg-sec{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
 .cfg-sec b{display:block;font-size:13.5px}
 .cfg-sec small{display:block;color:var(--ink-3);font-size:12px;line-height:1.4}
+
+/* janela de impressão: escolher as partes do relatório */
+dialog.imp{padding-bottom:18px}
+.imp fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:10px 0 8px}
+.imp legend{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);font-weight:600;padding:0 8px 0 0}
+.imp label{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:13.5px;cursor:pointer;flex-wrap:wrap}
+.imp label.sub{padding-left:24px;font-size:12.5px;color:var(--ink-2)}
+.imp label small{color:var(--ink-3);font-size:12px;flex-basis:100%;padding-left:24px;margin-top:-2px}
+.imp input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;transform:translateY(2px)}
+.imp-todos{border:0;background:none;color:var(--accent);cursor:pointer;font:inherit;font-size:12.5px;padding:0}
+.imp-aviso{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:12.5px;margin:6px 0 0}
+.imp-aviso[hidden]{display:none}
+.imp-botoes{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.imp-botoes .btn:disabled{opacity:.5;cursor:not-allowed}
 .datebox{display:flex}
 .datebox .ctl{border-radius:0;margin-left:-1px}
 .datebox .ctl:first-child{border-radius:10px 0 0 10px;margin:0}
@@ -318,6 +332,20 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   .card{break-inside:avoid}
   .grid2{grid-template-columns:1.3fr 1fr}
   td input,td select{border:0;padding:0;appearance:none}
+  .kpis.cp{grid-template-columns:1fr 1fr 1fr}   /* na folha A4 os 3 cards financeiros cabem lado a lado */
+  .kpis.cp .bonif{grid-column:auto}
+  .kpis.cp .val{font-size:22px}
+  .mes{grid-template-columns:1fr auto}   /* no papel: só mês e valor, sem a barrinha */
+  .mes .trk{display:none}
+  /* tabelas cabem na largura da folha: nada de rolagem lateral cortando a coluna de valor */
+  .tablebox{overflow:visible}
+  th,td{padding:5px 6px}
+  th{letter-spacing:.02em}
+  .exp-cel{width:26px;padding-right:0}
+  .exp{padding:0;gap:0}
+  .pill{white-space:normal;padding:1px 6px}
+  .pr-oculto{display:none!important}   /* partes desmarcadas na janela de impressão */
+  .grid2:has(> .pr-oculto){grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -353,7 +381,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   <div class="alert" id="alerta"></div>
 
   <main id="conteudo" class="so-dia">
-    <section class="kpis">
+    <section class="kpis" data-imprimir="cards">
       <div class="card kpi main">
         <div class="lbl"><svg class="i" viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>Notas que chegaram hoje</div>
         <div class="val num" id="k-cheg">—</div>
@@ -372,7 +400,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
     </section>
 
     <!-- contas a pagar geradas pelas notas lançadas no dia, pelo mês de vencimento -->
-    <section class="kpis cp">
+    <section class="kpis cp" data-imprimir="financeiro">
       <div class="card kpi filtro" data-faixa="mes" role="button" tabindex="0" title="Títulos das notas lançadas neste dia com vencimento até o fim do mês. Clique para filtrar as notas.">
         <div class="lbl"><span class="dot" style="background:var(--accent)"></span><span id="k-cpm-l">Contas a pagar deste mês</span></div>
         <div class="val num" id="k-cpm">—</div>
@@ -393,13 +421,13 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       </div>
     </section>
 
-    <section class="grid2">
-      <div class="card panel">
+    <section class="grid2" id="sec-paineis">
+      <div class="card panel" data-imprimir="usuarios">
         <h2>Lançamentos por usuário</h2>
         <div class="hint">Quantidade de notas lançadas por quem fez o lançamento no SISMOURA</div>
         <div id="usuarios"></div>
       </div>
-      <div class="card panel">
+      <div class="card panel" data-imprimir="lojas">
         <h2>Resumo por loja</h2>
         <div class="hint">Lançadas no sistema · a lançar, anteriores e pendentes em aberto</div>
         <div class="tablebox"><table id="t-lojas">
@@ -409,7 +437,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
       </div>
     </section>
 
-    <section class="card panel">
+    <section class="card panel" id="sec-tabelas">
       <div class="ph">
         <div class="tabs" role="tablist">
           <button class="tab on" data-t="lancadas">Lançadas<span class="cnt" id="c-lanc">0</span></button>
@@ -419,7 +447,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
         <input class="ctl search no-print" id="busca" placeholder="Buscar NF, fornecedor, usuário…">
       </div>
 
-      <div class="view on" id="v-lancadas">
+      <div class="view on" id="v-lancadas" data-imprimir="t-lancadas">
         <h3 class="print-only">Notas lançadas</h3>
         <div class="filtro-ativo" id="filtro-cp" hidden>Mostrando só as notas com <span class="pill" id="filtro-cp-txt"></span><button class="no-print" id="filtro-cp-limpar">limpar filtro</button></div>
         <div class="tablebox"><table>
@@ -428,7 +456,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
         </table></div>
       </div>
 
-      <div class="view manual" id="v-alancar" data-tipo="alancar">
+      <div class="view manual" id="v-alancar" data-tipo="alancar" data-imprimir="t-alancar">
         <h3 class="print-only">Notas a lançar</h3>
         <div class="drop"><svg class="i" viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Solte os XMLs ou o ZIP para importar como “a lançar”</div>
         <div class="toolbar"></div>
@@ -438,7 +466,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
         </table></div>
       </div>
 
-      <div class="view manual" id="v-pendente" data-tipo="pendente">
+      <div class="view manual" id="v-pendente" data-tipo="pendente" data-imprimir="t-pendente">
         <h3 class="print-only">Notas pendentes</h3>
         <div class="drop"><svg class="i" viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Solte os XMLs ou o ZIP para importar como “pendentes”</div>
         <div class="toolbar"></div>
@@ -503,6 +531,31 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
 <div class="tip" id="tip"></div>
 <div class="toast" id="toast"><button class="x" onclick="this.parentNode.classList.remove('on')">×</button><div id="toast-c"></div></div>
 <input type="file" id="arquivos" accept=".xml,.zip" multiple hidden>
+
+<dialog class="cfg imp" id="imp" aria-labelledby="imp-titulo">
+  <form method="dialog"><button class="x" title="Fechar">×</button></form>
+  <h2 id="imp-titulo">Imprimir / gerar PDF</h2>
+  <p class="cfg-info">Escolha o que vai sair na impressão. <button type="button" class="imp-todos" id="imp-todos">Marcar todos</button> · <button type="button" class="imp-todos" id="imp-nenhum">Desmarcar todos</button></p>
+  <fieldset><legend>Estatísticas</legend>
+    <label><input type="checkbox" name="parte" value="cards"> Cards de notas <small>chegaram hoje, lançadas, a lançar, anteriores, pendentes</small></label>
+    <label><input type="checkbox" name="parte" value="financeiro"> Financeiro <small>a pagar deste mês, próximos meses, bonificado do dia</small></label>
+  </fieldset>
+  <fieldset><legend>Resumos</legend>
+    <label><input type="checkbox" name="parte" value="usuarios"> Lançamentos por usuário</label>
+    <label><input type="checkbox" name="parte" value="lojas"> Resumo por loja</label>
+  </fieldset>
+  <fieldset><legend>Tabelas</legend>
+    <label><input type="checkbox" name="parte" value="t-lancadas"> Notas lançadas</label>
+    <label class="sub"><input type="checkbox" id="imp-contas"> com as contas a pagar de cada nota (expandidas)</label>
+    <label><input type="checkbox" name="parte" value="t-alancar"> Notas a lançar</label>
+    <label><input type="checkbox" name="parte" value="t-pendente"> Notas pendentes</label>
+  </fieldset>
+  <p class="imp-aviso" id="imp-aviso" hidden></p>
+  <div class="imp-botoes">
+    <button type="button" class="ctl btn" id="imp-cancelar">Cancelar</button>
+    <button type="button" class="ctl btn primary" id="imp-ok"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir</button>
+  </div>
+</dialog>
 
 <dialog class="cfg" id="cfg">
   <form method="dialog"><button class="x" title="Fechar">×</button></form>
@@ -1049,7 +1102,47 @@ $('#data').onchange = carregar;
 $('#loja').onchange = () => { store.set('loja', $('#loja').value); emDash() ? carregarDash() : carregar(); };
 const emDash = () => document.body.classList.contains('dash');
 $('#atualizar').onclick = () => emDash() ? carregarDash() : carregar();
-$('#imprimir').onclick = () => print();
+// ---- impressão: a janela deixa escolher as partes do relatório (o dashboard imprime direto) ----
+const partesMarcadas = () => $$('#imp input[name=parte]:checked').map(c => c.value);
+function atualizarJanelaImp() {
+  const partes = partesMarcadas();
+  $('#imp-ok').disabled = !partes.length;
+  $('#imp-contas').disabled = !partes.includes('t-lancadas');
+}
+$('#imprimir').onclick = () => {
+  if (emDash()) return print();
+  let salvo = null;
+  try { salvo = JSON.parse(store.get('impressao') || 'null'); } catch {}
+  $$('#imp input[name=parte]').forEach(c => c.checked = salvo ? salvo.partes.includes(c.value) : true);
+  $('#imp-contas').checked = !!salvo?.contas;
+  // a tabela de lançadas sai como está na tela: avisa se há busca ou filtro de card ativo
+  const filtros = [$('#busca').value.trim() && `busca "${$('#busca').value.trim()}"`, filtroCP && $('#filtro-cp-txt').textContent].filter(Boolean);
+  $('#imp-aviso').hidden = !filtros.length;
+  $('#imp-aviso').textContent = filtros.length ? `As tabelas saem com o filtro da tela: ${filtros.join(' e ')}.` : '';
+  atualizarJanelaImp();
+  $('#imp').showModal();
+};
+$('#imp').addEventListener('change', atualizarJanelaImp);
+$('#imp-todos').onclick = () => { $$('#imp input[name=parte]').forEach(c => c.checked = true); atualizarJanelaImp(); };
+$('#imp-nenhum').onclick = () => { $$('#imp input[name=parte]').forEach(c => c.checked = false); atualizarJanelaImp(); };
+$('#imp-cancelar').onclick = () => $('#imp').close();
+$('#imp').onclick = e => { if (e.target === $('#imp')) $('#imp').close(); };   // clique fora fecha
+$('#imp-ok').onclick = () => {
+  const partes = partesMarcadas(), contas = $('#imp-contas').checked && partes.includes('t-lancadas');
+  store.set('impressao', JSON.stringify({partes, contas: $('#imp-contas').checked}));
+  $$('[data-imprimir]').forEach(el => el.classList.toggle('pr-oculto', !partes.includes(el.dataset.imprimir)));
+  $('#sec-paineis').classList.toggle('pr-oculto', !partes.includes('usuarios') && !partes.includes('lojas'));
+  $('#sec-tabelas').classList.toggle('pr-oculto', !partes.some(p => p.startsWith('t-')));
+  // expande temporariamente as contas a pagar de todas as notas e volta ao estado da tela depois
+  const antes = contas ? new Set(abertas) : null;
+  if (contas) { lancadasVisiveis().forEach(n => abertas.add(chaveNota(n))); renderLancadas(); }
+  window.addEventListener('afterprint', () => {
+    $$('.pr-oculto').forEach(el => el.classList.remove('pr-oculto'));
+    if (antes) { abertas.clear(); antes.forEach(k => abertas.add(k)); renderLancadas(); }
+  }, {once: true});
+  $('#imp').close();
+  setTimeout(print, 50);   // deixa a janela fechar antes de abrir a impressão
+};
 
 // ---- exportação para Excel (mesmos números da tela) ----
 function situacaoTexto(m) {
