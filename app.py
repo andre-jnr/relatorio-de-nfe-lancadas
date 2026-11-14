@@ -72,10 +72,18 @@ CNPJ_LOJA = {
     "19234190000725": "Morada do Sol",
 }
 
+# Transferência entre lojas: CFOP de entrada de transferência (1.xxx no estado, 2.xxx de fora) e,
+# no Contas a Pagar, a conta corrente '2' (é assim que o SISMOURA marca o título de transferência).
+CFOPS_TRANSFERENCIA = ("1152", "1409", "1552", "1557", "2152", "2409", "2552", "2557")
+CONTA_TRANSFERENCIA = "2"
+
 # Usuário que lançou: Operador da entrada → usuário que abriu → operador do título gerado no Contas a Pagar.
 SQL_LANCADAS = """
 SELECT e.Chave, e.Chave_NFE, e.Data_Cadastro, e.Nota_Fiscal, e.Serie, e.Nome_Fornecedor,
-       e.Valor_Nota, e.Data_Emissao, u.Nome AS Usuario, b.Bonificado
+       e.Valor_Nota, e.Data_Emissao, u.Nome AS Usuario, b.Bonificado,
+       CASE WHEN EXISTS (SELECT 1 FROM Entrada_Produto_Itens i
+                         WHERE i.Chave = e.Chave AND REPLACE(i.CFOP, '.', '') IN ({cfops_transf}))
+            THEN 1 ELSE 0 END AS Transf_CFOP
 FROM Entrada_Produto e
 OUTER APPLY (SELECT SUM(i.Valor_Total) AS Bonificado
              FROM Entrada_Produto_Itens i
@@ -86,11 +94,11 @@ OUTER APPLY (SELECT TOP 1 NULLIF(cp.Operador, 0) AS Op
 LEFT JOIN Usuario u ON u.Codigo = COALESCE(NULLIF(e.Operador, 0), NULLIF(e.Aberto_Usuario, 0), cp.Op)
 WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ?
 ORDER BY e.Data_Cadastro
-"""
+""".format(cfops_transf=",".join(f"'{c}'" for c in CFOPS_TRANSFERENCIA))
 
 # Contas a pagar geradas pelas notas lançadas no período (títulos excluídos ficam de fora).
 SQL_TITULOS = """
-SELECT cp.Codigo_Entrada, cp.Codigo, cp.Parcela, cp.Data_Vencimento, cp.Valor, cp.Pago
+SELECT cp.Codigo_Entrada, cp.Codigo, cp.Parcela, cp.Data_Vencimento, cp.Valor, cp.Pago, cp.Conta_Corrente
 FROM Contas_Pagar cp
 JOIN Entrada_Produto e ON e.Chave = cp.Codigo_Entrada
 WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ? AND cp.Data_Exclusao IS NULL
@@ -181,6 +189,8 @@ def buscar_lancadas(loja, dia):
                 "prazo": (t["Data_Vencimento"].date() - emissao).days if emissao else None,
                 "valor": float(t["Valor"] or 0),
                 "pago": t["Pago"] == "S",
+                # título de transferência entre lojas: não é pagamento a fornecedor
+                "transferencia": (t["Conta_Corrente"] or "").strip() == CONTA_TRANSFERENCIA,
             } for t in por_entrada.get(d["Chave"], [])],
             "loja": LOJAS[loja],
             "chave": d["Chave"],
@@ -191,6 +201,9 @@ def buscar_lancadas(loja, dia):
             "fornecedor": (d["Nome_Fornecedor"] or "").strip(),
             "valor": float(d["Valor_Nota"] or Decimal(0)),
             "bonificado": float(d["Bonificado"] or Decimal(0)),  # itens com CFOP 1.910/2.910 (bonificação)
+            # transferência entre lojas: CFOP de transferência nos itens ou título marcado como transferência
+            "transferencia": bool(d["Transf_CFOP"]) or any(
+                (t["Conta_Corrente"] or "").strip() == CONTA_TRANSFERENCIA for t in por_entrada.get(d["Chave"], [])),
             "emissao": d["Data_Emissao"].strftime("%d/%m/%Y") if d["Data_Emissao"] else "",
             "usuario": " ".join((d["Usuario"] or "Não identificado").split()).title(),
         })
@@ -335,7 +348,8 @@ SELECT SUM(cp.Valor * DATEDIFF(day, e.Data_Emissao, cp.Data_Vencimento)) AS Valo
 FROM Contas_Pagar cp
 JOIN Entrada_Produto e ON e.Chave = cp.Codigo_Entrada
 WHERE e.Data_Cadastro >= ? AND e.Data_Cadastro < ? AND cp.Data_Exclusao IS NULL AND e.Data_Emissao IS NOT NULL
-"""
+  AND ISNULL(LTRIM(RTRIM(cp.Conta_Corrente)), '') <> '{conta_transf}'   -- transferência entre lojas não é prazo de fornecedor
+""".format(conta_transf=CONTA_TRANSFERENCIA)
 
 SQL_DASH_BONIF = """
 SELECT SUM(i.Valor_Total) AS Bonificado, COUNT(DISTINCT i.Chave) AS Notas
@@ -595,6 +609,8 @@ def gerar_excel(p):
         ["Contas a pagar deste mês", k["cp_mes"]["qt"], k["cp_mes"]["valor"],
          f"Títulos das lançadas com vencimento até o fim de {k['cp_mes']['mes']}"],
         ["Contas a pagar dos próximos meses", k["cp_prox"]["qt"], k["cp_prox"]["valor"], k["cp_prox"]["meses"]],
+        ["Transferências entre lojas", k.get("transf", {}).get("qt", 0), k.get("transf", {}).get("valor", 0),
+         "Títulos de transferência ficam fora das contas a pagar"],
         ["Bonificado (CFOP 1.910/2.910)", k["bonif"]["qt"], k["bonif"]["valor"],
          f"{k['bonif']['so_bonif']} só de bonificação · {k['bonif']['qt'] - k['bonif']['so_bonif']} mista(s)"],
     ], {3: MOEDA})

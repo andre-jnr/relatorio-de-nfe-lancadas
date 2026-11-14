@@ -162,7 +162,8 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .orow small{grid-column:2 / -1;color:var(--ink-3);font-size:11.5px}
 
 /* cards de contas a pagar (este mês / próximos meses) */
-.kpis.cp{grid-template-columns:1fr 1fr .8fr}
+.kpis.cp{grid-template-columns:1fr 1fr .8fr .8fr}
+.pill.transf{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
 .kpis.cp .val{font-size:30px}
 .tit-box tr.bon td{color:var(--ok)}
 .tit-box tr.bon td:first-child{font-weight:600}
@@ -298,8 +299,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   .toolbar{grid-template-columns:1fr}
 }
 @media (max-width:900px){
-  .kpis.cp{grid-template-columns:1fr 1fr}
-  .kpis.cp .bonif{grid-column:1 / -1}
+  .kpis.cp{grid-template-columns:1fr 1fr}   /* 2 x 2 */
   .kpis{grid-template-columns:repeat(2,1fr)}
   .grid2{grid-template-columns:1fr}
   .addrow,.addrow.semmotivo{grid-template-columns:1fr 1fr}
@@ -381,9 +381,9 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   .tit-box .pill{font-size:7.5px;padding:0 4px}
   .tit-dif{font-size:8.5px}
   .pr-sem-usu .col-usu{display:none!important}   /* "Lançamentos por usuário" desmarcado */
-  .kpis.cp{grid-template-columns:repeat(3,minmax(0,1fr))}   /* na folha A4 os 3 cards financeiros cabem lado a lado */
+  .kpis.cp{grid-template-columns:repeat(4,minmax(0,1fr))}   /* na folha A4 os 4 cards financeiros cabem lado a lado */
   .kpis.cp .bonif{grid-column:auto}
-  .kpis.cp .val{font-size:20px}
+  .kpis.cp .val{font-size:16px}
   .mes{font-size:10px}
   .mes{grid-template-columns:1fr auto}   /* no papel: só mês e valor, sem a barrinha */
   .mes .trk{display:none}
@@ -467,6 +467,12 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
         <div class="val num" id="k-bon">—</div>
         <div class="money num" id="k-bon-q">—</div>
         <div class="foot" id="k-bon-f"></div>
+      </div>
+      <div class="card kpi filtro transf" data-faixa="transf" role="button" tabindex="0" title="Notas de transferência entre lojas (CFOP 1.152/1.409/1.552/1.557 ou título de transferência no SISMOURA). Os títulos delas não entram nas contas a pagar. Clique para filtrar as notas.">
+        <div class="lbl"><svg class="i" viewBox="0 0 24 24" style="color:var(--ink-2)"><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/></svg>Transferências do dia</div>
+        <div class="val num" id="k-tra">—</div>
+        <div class="money num" id="k-tra-q">—</div>
+        <div class="foot" id="k-tra-f"></div>
       </div>
     </section>
 
@@ -587,7 +593,7 @@ footer{color:var(--ink-3);font-size:12px;margin-top:22px;text-align:center}
   <p class="cfg-info">Escolha o que vai sair na impressão. <button type="button" class="imp-todos" id="imp-todos">Marcar todos</button> · <button type="button" class="imp-todos" id="imp-nenhum">Desmarcar todos</button></p>
   <fieldset><legend>Estatísticas</legend>
     <label><input type="checkbox" name="parte" value="cards"> Cards de notas <small>chegaram hoje, lançadas, a lançar, anteriores, pendentes</small></label>
-    <label><input type="checkbox" name="parte" value="financeiro"> Financeiro <small>a pagar deste mês, próximos meses, bonificado do dia</small></label>
+    <label><input type="checkbox" name="parte" value="financeiro"> Financeiro <small>a pagar deste mês, próximos meses, bonificado e transferências do dia</small></label>
   </fieldset>
   <fieldset><legend>Resumos</legend>
     <label><input type="checkbox" name="parte" value="usuarios"> Lançamentos por usuário <small>desmarcado, some também a coluna Usuário das notas lançadas</small></label>
@@ -845,7 +851,8 @@ const nomeMes = ym => NOME_MES.format(new Date(ym + '-15T12:00Z'));
 const anoMes = t => t.vencimento.slice(6, 10) + '-' + t.vencimento.slice(3, 5);   // "dd/mm/aaaa" → "aaaa-mm"
 const faixaTitulo = t => anoMes(t) <= D.slice(0, 7) ? 'mes' : 'prox';
 function contasAPagar() {
-  const tit = lancadas.flatMap(n => n.titulos.map(t => ({...t, nota: chaveNota(n), ym: anoMes(t)})));
+  // títulos de transferência entre lojas não são contas a pagar a fornecedor: vão para o card de transferências
+  const tit = lancadas.flatMap(n => n.titulos.filter(t => !t.transferencia).map(t => ({...t, nota: chaveNota(n), ym: anoMes(t)})));
   const mes = tit.filter(t => faixaTitulo(t) === 'mes'), prox = tit.filter(t => faixaTitulo(t) === 'prox');
   const porMes = {};
   prox.forEach(t => porMes[t.ym] = (porMes[t.ym] || 0) + t.valor);
@@ -859,7 +866,8 @@ const resumoTitulos = arr => {
 // Filtro pelos cards: 'mes'/'prox' = notas com ao menos um título na faixa; 'bonif' = notas com bonificação;
 // null = sem filtro
 let filtroCP = null;
-const TEXTO_FILTRO = {prox: 'contas a pagar dos próximos meses', bonif: 'bonificação (CFOP 1.910/2.910)'};
+const TEXTO_FILTRO = {prox: 'contas a pagar dos próximos meses', bonif: 'bonificação (CFOP 1.910/2.910)',
+                      transf: 'transferência entre lojas'};
 function filtrarPorCP(faixa) {
   filtroCP = filtroCP === faixa ? null : faixa;   // clicar no card ativo desliga o filtro
   if (filtroCP) {
@@ -880,6 +888,14 @@ function renderContasAPagar() {
   $('#filtro-cp').hidden = !filtroCP;
   if (filtroCP) $('#filtro-cp-txt').textContent = filtroCP === 'mes'
     ? `contas a pagar de ${nomeMes(mesD).split(' de ')[0]}` : TEXTO_FILTRO[filtroCP];
+
+  const tra = lancadas.filter(n => n.transferencia);
+  const titTra = tra.flatMap(n => n.titulos.filter(t => t.transferencia)), semTitulo = tra.filter(n => !n.titulos.length).length;
+  $('#k-tra').textContent = BRL.format(tra.reduce((s, n) => s + n.valor, 0));
+  $('#k-tra-q').textContent = `${INT.format(tra.length)} nota${tra.length === 1 ? '' : 's'}`;
+  $('#k-tra-f').innerHTML = !tra.length ? 'Nenhuma transferência lançada'
+    : (titTra.length ? `<b>${titTra.length}</b> título${titTra.length > 1 ? 's' : ''} (${BRL.format(soma(titTra))}) fora das contas a pagar` : 'Sem títulos de transferência')
+      + (semTitulo ? ` · <b>${semTitulo}</b> sem título` : '');
 
   const bon = lancadas.filter(n => n.bonificado > 0), soBonif = bon.filter(n => !n.titulos.length).length;
   $('#k-bon').textContent = BRL.format(bon.reduce((s, n) => s + n.bonificado, 0));
@@ -912,13 +928,16 @@ const chaveNota = n => n.loja + '|' + n.chave;
 // Primeiro e último nome (usado na impressão, onde o nome completo quebra a linha da tabela)
 const nomeCurto = nome => { const p = String(nome || '').trim().split(/\s+/); return p.length > 2 ? p[0] + ' ' + p[p.length - 1] : p.join(' '); };
 const lancadasVisiveis = () => lancadas.filter(n => filtroBusca([n.nf, n.fornecedor, n.usuario, n.loja].join(' '))
-  && (!filtroCP || (filtroCP === 'bonif' ? n.bonificado > 0 : n.titulos.some(t => faixaTitulo(t) === filtroCP))));
+  && (!filtroCP || (filtroCP === 'bonif' ? n.bonificado > 0
+                  : filtroCP === 'transf' ? n.transferencia
+                  : n.titulos.some(t => !t.transferencia && faixaTitulo(t) === filtroCP))));
 
 function detalheTitulos(n) {
   if (!n.titulos.length && !n.bonificado) return '<div class="tit-box"><div class="tit-vazio">Nenhuma conta a pagar vinculada a esta nota.</div></div>';
   // Total = títulos a pagar + itens bonificados (que não geram conta a pagar); deve bater com o valor da nota
   const total = soma(n.titulos) + n.bonificado, dif = n.valor - total;
-  const esmaece = t => (filtroCP === 'mes' || filtroCP === 'prox') && faixaTitulo(t) !== filtroCP;
+  const esmaece = t => ((filtroCP === 'mes' || filtroCP === 'prox') && (t.transferencia || faixaTitulo(t) !== filtroCP))
+                    || (filtroCP === 'transf' && !t.transferencia);
   const linhaBonif = n.bonificado ? `<tr class="bon${filtroCP === 'mes' || filtroCP === 'prox' ? ' fora' : ''}">
       <td colspan="4">Bonificação <span style="color:var(--ink-3);font-weight:400">· itens com CFOP 1.910/2.910, sem conta a pagar</span></td>
       <td class="r num">${BRL.format(n.bonificado)}</td></tr>` : '';
@@ -926,7 +945,7 @@ function detalheTitulos(n) {
     <thead><tr><th>Código</th><th>Parcela</th><th>Vencimento</th><th class="r">Prazo</th><th class="r">Valor</th></tr></thead>
     <tbody>${n.titulos.map(t => `<tr${esmaece(t) ? ' class="fora"' : ''}>
       <td class="num">${t.codigo}</td><td class="num">${t.parcela}/${n.titulos.length}</td>
-      <td class="num">${t.vencimento}${t.pago ? ' <span class="pill ok">pago</span>' : ''}</td>
+      <td class="num">${t.vencimento}${t.pago ? ' <span class="pill ok">pago</span>' : ''}${t.transferencia ? ' <span class="pill transf" title="Título de transferência entre lojas: não entra nas contas a pagar">transferência</span>' : ''}</td>
       <td class="r num" title="Dias da emissão (${n.emissao}) até o vencimento">${t.prazo == null ? '—' : t.prazo + (Math.abs(t.prazo) === 1 ? ' dia' : ' dias')}</td>
       <td class="r num">${BRL.format(t.valor)}</td></tr>`).join('')}${linhaBonif}</tbody>
     <tfoot><tr><td colspan="4">Total${Math.abs(dif) >= 0.01 ? `<span class="tit-dif">${BRL.format(dif)} de diferença para o valor da nota</span>` : ''}</td>
@@ -959,7 +978,8 @@ function renderLancadas() {
     <td>${esc(n.fornecedor)}${n.chegada < D ? ` <span class="pill old" title="Estava no a lançar/pendentes desde ${dmy(n.chegada)}">chegou ${dm(n.chegada)}</span>` : ''}${
       !n.bonificado ? '' : n.bonificado >= n.valor - 0.01
         ? ' <span class="pill ok" title="Todos os itens com CFOP de bonificação">bonificação</span>'
-        : ` <span class="pill ok" title="Parte dos itens é bonificação (CFOP 1.910/2.910)">bonif. ${BRL.format(n.bonificado)}</span>`}</td><td class="num">${n.emissao}</td>
+        : ` <span class="pill ok" title="Parte dos itens é bonificação (CFOP 1.910/2.910)">bonif. ${BRL.format(n.bonificado)}</span>`}${
+      n.transferencia ? ' <span class="pill transf" title="Transferência entre lojas">transferência</span>' : ''}</td><td class="num">${n.emissao}</td>
     <td class="col-usu"><span class="pill">${esc(n.usuario)}</span><span class="papel" title="${esc(n.usuario)}">${esc(nomeCurto(n.usuario))}</span></td><td class="r num">${BRL.format(n.valor)}</td></tr>`
       + (aberta ? `<tr class="det"><td></td><td colspan="7">${detalheTitulos(n)}</td></tr>` : '');
   }).join('')
@@ -1233,6 +1253,8 @@ $('#excel').onclick = async () => {
         alancar: {qt: g.alHoje.length, valor: soma(g.alHoje)},
         anteriores: {qt: g.alAnt.length, valor: soma(g.alAnt), mes_anterior: g.alAnt.filter(m => m.data.slice(0,7) < D.slice(0,7)).length},
         pendentes: {qt: g.pend.length, valor: soma(g.pend), novas: g.pend.filter(m => m.data === D).length},
+        transf: {qt: lancadas.filter(n => n.transferencia).length,
+                 valor: lancadas.filter(n => n.transferencia).reduce((s, n) => s + n.valor, 0)},
         bonif: {qt: lancadas.filter(n => n.bonificado > 0).length, valor: lancadas.reduce((s, n) => s + n.bonificado, 0),
                 so_bonif: lancadas.filter(n => n.bonificado > 0 && !n.titulos.length).length},
         cp_mes: {qt: cp.mes.length, valor: soma(cp.mes), mes: nomeMes(D.slice(0, 7))},
